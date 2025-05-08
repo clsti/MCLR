@@ -1,0 +1,11 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: File",
+            "type": "python",
+            "request": "launch",
+            "program": "exercise_01/src/ros_visuals/ros_visuals/t11.py"
+        },
+    ]
+}
