@@ -46,6 +46,7 @@ class CageTFBroadcaster(Node):
         # Marker point parameters
         self.c1_point = {
             "ref_frame": "corner_1",
+            "id": 1,
             "coords": np.array([0.2, 0.3, 0.1])
         }
         self.world_point = {
@@ -183,7 +184,8 @@ class CageTFBroadcaster(Node):
             self.pub_marker_c1_p, self.c1_point["ref_frame"],
             self.c1_point["coords"], self.color_orange)
 
-        center_point = self.cage_tfs[1].act(self.c1_point["coords"])
+        center_point = self.cage_tfs[self.c1_point["id"]].act(
+            self.c1_point["coords"])
         world_point = self.H_iterator.act(center_point)
 
         self.pub_visualization_marker(
