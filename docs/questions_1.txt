@@ -1,0 +1,17 @@
+3. Take a look at figure 1. Are all the frames correct? If not, Which ones are not and why? Write your answers in a questions.txt file.
+- axis alignment of coordinate system O_3 does not correspond to right hand rule
+  To align it with the other coordinate frames (z-axis upwards) and correspond to right hand rule:
+  x (red) and y (green) axis have to be changed i.e.
+  - x_3 axis in negative x_0 axis direction and
+  - y_3 axis in negative y_0 axis direction
+- axis alignment of coordinate system O_5 does not correspond to right hand rule
+  To align it with the other coordinate frames (z-axis downwards) and correspond to right hand rule:
+  x (red) and y (green) axis have to be changed i.e.
+  - y_5 axis in positive x_0 direction and
+  - x_5 axis in positive y_0 irection
+
+
+5. Are they exactly the same in the rviz view? if you change the markers for cubes, what do you notice regarding the orientation and why is it?
+  - the cubes do not (always) have the same orientation
+  - since the markers are only specified with a point, the orientation of the cube is aligned with the orientation of its respective reference frame
+  - Thus the cubes only match if the coordinate frame axes are aligned/parallel
