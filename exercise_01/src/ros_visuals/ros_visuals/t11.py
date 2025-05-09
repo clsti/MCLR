@@ -4,7 +4,6 @@ from rclpy.node import Node
 import tf2_ros
 from geometry_msgs.msg import TransformStamped
 from visualization_msgs.msg import Marker
-from geometry_msgs.msg import Point
 
 import pinocchio as pin
 import numpy as np
@@ -40,8 +39,8 @@ class CageTFBroadcaster(Node):
         self.cage_tfs = self.build_cage()
 
         # Publisher for marker
-        self.pub_marker_c1_p = self.create_publisher(Marker, 'marker_c1_p', 1)
-        self.pub_marker_w_p = self.create_publisher(Marker, 'marker_w_p', 1)
+        self.pub_marker_c1_p = self.create_publisher(Marker, 'marker_c1_p', 10)
+        self.pub_marker_w_p = self.create_publisher(Marker, 'marker_w_p', 10)
 
         # Marker point parameters
         self.c1_point = {
