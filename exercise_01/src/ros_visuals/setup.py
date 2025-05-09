@@ -27,7 +27,8 @@ setup(
     entry_points={
         'console_scripts': [
             't11 = ros_visuals.t11:main',
-            't12 = ros_visuals.t12:main'
+            't12 = ros_visuals.t12:main',
+            't13 = ros_visuals.t13:main'
         ],
     },
 )
