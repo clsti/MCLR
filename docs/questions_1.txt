@@ -23,8 +23,19 @@ b
 8. When you make the cage spin (as in exercise 1), which component of the transformed twists stays constant? why not the other?
   - twist origined in the world frame stays constant since world frame fixed, 
     however transformed to the corner cage frame, the twist varies since the cage rotates
-  - twist originated in the corner cage frame stays constant within the cage frame,
-    but varies in world frame due to motion of the cage
+  - twist originated in the corner cage frame stays constant within the cage frame, varies in world frame due to motion of the cage and
+    varies also transformed to the world frame
   - in general: 
-    - direction/orientation of the angular velocity vector stays the same (globally; locally it changes due to cage rotation)
-    - linear velocity will differ based on its displacement from the rotation axis of the cage
+    - direction/orientation of the angular velocity vector stays the same (globally; locally it changes due to cage rotation; only rotation in transformation)
+    - linear velocity will differ based on its displacement (translation vector) from the rotation axis of the cage
+
+c
+
+8. When you make the cage spin, which component of the transformed wrench stays constant? why not the other?
+  - wrist origined in the world frame stays constant since world frame fixed,
+    however transformed to the corner cage frame, it varies since the cage rotates
+  - wrist originated in the corner cage frame stays constant within the cage frame, varies in world frame due to motion of the cage and
+    varies also transformed to the world frame
+  - in general:
+    - direction/orientation of the force vector stays the same (globally; locally it changes due to cage rotation; only rotation in transformation)
+    - torque will differ based on its displacement (translation vector) from the rotation axis of the cage
