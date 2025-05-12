@@ -84,7 +84,7 @@ class CageTFBroadcaster(Node):
         H_4 = self.create_SE3_transformations(
             0, 0, 270, -self.l_cage, self.w_cage, -self.h_cage)
         H_5 = self.create_SE3_transformations(
-            270, 0, 0, -self.l_cage, -self.w_cage, self.h_cage)
+            0, 180, 270, -self.l_cage, -self.w_cage, self.h_cage)
         H_6 = self.create_SE3_transformations(
             0, 180, 0, self.l_cage, -self.w_cage, self.h_cage)
         H_7 = self.create_SE3_transformations(
