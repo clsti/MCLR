@@ -191,9 +191,9 @@ class CageTFBroadcaster(Node):
         wrench_msg.header.stamp = self.get_clock().now().to_msg()
         wrench_msg.header.frame_id = ref_frame
 
-        wrench_msg.wrench.force.y = W.linear[0]
-        wrench_msg.wrench.force.z = W.linear[1]
-        wrench_msg.wrench.force.x = W.linear[2]
+        wrench_msg.wrench.force.x = W.linear[0]
+        wrench_msg.wrench.force.y = W.linear[1]
+        wrench_msg.wrench.force.z = W.linear[2]
         wrench_msg.wrench.torque.x = W.angular[0]
         wrench_msg.wrench.torque.y = W.angular[1]
         wrench_msg.wrench.torque.z = W.angular[2]
@@ -243,29 +243,27 @@ class CageTFBroadcaster(Node):
             world_point, self.color_green)
 
         # Wrench from corner to world frame
-        self.pub_visualization_wrench(
-            self.c2w["pub_wrench_c3_W"], self.c2w["init_frame"], self.c2w["wrench"])
-
         w_H_c3 = self.H_iterator * self.cage_tfs[self.c2w["init_id"]]
         wrench_w_W = self.wrench_transformation(w_H_c3, self.c2w["wrench"])
         pin_wrench_w_W = self.pin_wrench_transformation(
             w_H_c3, self.c2w["wrench"])
 
         self.pub_visualization_wrench(
+            self.c2w["pub_wrench_c3_W"], self.c2w["init_frame"], self.c2w["wrench"])
+        self.pub_visualization_wrench(
             self.c2w["pub_wrench_world_W"], self.c2w["target_frame"], wrench_w_W)
         self.pub_visualization_wrench(
             self.c2w["pub_pin_wrench_world_W"], self.c2w["target_frame"], pin_wrench_w_W)
 
         # Wrench from world to corner frame
-        self.pub_visualization_wrench(
-            self.w2c["pub_wrench_world_W"], self.w2c["init_frame"], self.w2c["wrench"])
-
         w_H_c2 = self.H_iterator * self.cage_tfs[self.w2c["target_id"]]
         c2_H_w = w_H_c2.inverse()
         wrench_c2_W = self.wrench_transformation(c2_H_w, self.w2c["wrench"])
         pin_wrench_c2_W = self.pin_wrench_transformation(
             c2_H_w, self.w2c["wrench"])
 
+        self.pub_visualization_wrench(
+            self.w2c["pub_wrench_world_W"], self.w2c["init_frame"], self.w2c["wrench"])
         self.pub_visualization_wrench(
             self.w2c["pub_wrench_c2_W"], self.w2c["target_frame"], wrench_c2_W)
         self.pub_visualization_wrench(
