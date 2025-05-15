@@ -60,6 +60,7 @@ class CageTFBroadcaster(Node):
         # Flag to set markers to cubes (exercise a-10)
         self.cube_flag = False
 
+        # TODO only use id instead of frame string
         # Twist from corner to world frame
         c2w_V_v = np.array([-0.4, 0.1, 0.0])
         c2w_V_omega = np.array([-0.3, 0.0, 0.1])
@@ -202,7 +203,6 @@ class CageTFBroadcaster(Node):
         pub.publish(twist_msg)
 
     def twist_transformation(self, H, V):
-        # TODO: correct???
         R = H.rotation
         t = H.translation
         omega_new = R @ V.angular
