@@ -20,7 +20,10 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            't2_temp = bullet_sims.t2_temp:run'
+            't2_temp = bullet_sims.t2_temp:run',
+            't21 = bullet_sims.t21:run',
+            't22 = bullet_sims.t22:run',
+            't23 = bullet_sims.t23:main'
         ],
     },
 )

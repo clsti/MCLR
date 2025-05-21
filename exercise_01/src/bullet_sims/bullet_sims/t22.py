@@ -91,12 +91,56 @@ pb.resetDebugVisualizerCamera(
 # Joint command vector
 tau = q_actuated_home*0
 
+# gain matrices
+Kx_I = np.diag(np.array([3]*12 + [1]*20))
+K_p = 400.0 * Kx_I  # stable: 400 / falling: 300
+K_d = 0.4 * Kx_I
+
+# desired joint state
+q_d = np.zeros_like(q_actuated_home)
+
+# spline parameters
+time = 1
+t_step_size = 0.001 / time
+t_step = 0.0
+
+q_floating_base = np.array([0, 0, z_init, 0, 0, 0, 1])
+q_home_act = q_actuated_home
+q_home_act[:6] = np.array([0, 0, -0.44, 0.9, -0.45, 0])  # left leg
+q_home_act[6:12] = np.array([0, 0, -0.44, 0.9, -0.45, 0])  # right leg
+q_home_act[14:22] = np.array([0, -0.24, 0, -1, 0, 0, 0, 0])  # left arm
+q_home_act[22:30] = np.array([0, -0.24, 0, -1, 0, 0, 0, 0])  # right arm
+
+q_init = q_home
+q_home_pos = np.hstack([q_floating_base, q_home_act])
+
+
+def spline_init_home(q_0, q_1, step):
+    # spline from q_init to q_home
+    if step >= 1.0:
+        step = 1.0
+    elif step <= 0.0:
+        step = 0.0
+    q = pin.interpolate(robot._model, q_0, q_1, step)
+    return q[7:]
+
+
 done = False
 while not done:
     # update the simulator and the robot
     simulator.step()
     simulator.debug()
     robot.update()
+
+    # mask floating base
+    q = robot.q()[7:]
+    v = robot.v()[6:]
+
+    q_d = spline_init_home(q_init, q_home_pos, t_step)
+    t_step += t_step_size
+
+    # PD controller
+    tau = K_p @ (q_d - q) - K_d @ v
 
     # command to the robot
     robot.setActuatedJointTorques(tau)

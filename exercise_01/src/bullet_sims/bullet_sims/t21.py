@@ -91,12 +91,27 @@ pb.resetDebugVisualizerCamera(
 # Joint command vector
 tau = q_actuated_home*0
 
+# gain matrices
+Kx_I = np.diag(np.array([3]*12 + [1]*20))
+K_p = 300.0 * Kx_I  # stable: 300 / falling: 200
+K_d = 0.4 * Kx_I
+
+# desired joint state
+q_d = np.zeros_like(q_actuated_home)
+
 done = False
 while not done:
     # update the simulator and the robot
     simulator.step()
     simulator.debug()
     robot.update()
+
+    # mask floating base
+    q = robot.q()[7:]
+    v = robot.v()[6:]
+
+    # PD controller
+    tau = K_p @ (q_d - q) - K_d @ v
 
     # command to the robot
     robot.setActuatedJointTorques(tau)
