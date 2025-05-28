@@ -96,7 +96,7 @@ class JointSpaceController:
         self.Kd = Kd
 
         self.model = self.robot._model
-        self.data = self.model.createData()
+        self.data = self.robot.data()
 
     def update(self, q_r, q_r_dot, q_r_ddot):
         # Compute jointspace torque, return torque
@@ -127,7 +127,7 @@ class CartesianSpaceController:
         self.damp = 1e-12
 
         self.model = self.robot._model
-        self.data = self.model.createData()
+        self.data = self.robot.data()
 
     def update(self, X_r, X_dot_r, X_ddot_r):
         # compute cartesian control torque, return torque
@@ -140,11 +140,11 @@ class CartesianSpaceController:
         id = self.model.getJointId(self.joint_name)
 
         # Compute the Joint Jacobian
-        l_J_id = pin.computeJointJacobian(self.model, self.data, q, id)
+        self.l_J_id = pin.computeJointJacobian(self.model, self.data, q, id)
 
         # Get current Cartesian pose & velocity of controlled frame
         w_X_id = self.data.oMi[id]
-        l_X_dot_id = l_J_id @ q_dot
+        l_X_dot_id = self.l_J_id @ q_dot
 
         # Compute the Cartesian desired acceleration
         pos_err = w_X_id.translation - X_r.translation
@@ -159,8 +159,9 @@ class CartesianSpaceController:
 
         # Map Cartesian desired acceleration to q_ddot_d
         # q_ddot_d = J_pinv @ (X_ddot_d - J_dot_q_dot)
-        inv_term = l_J_id.dot(l_J_id.T) + self.damp * np.eye(6)
-        q_ddot_d = l_J_id.T.dot(la.solve(inv_term, w_X_ddot_d - J_dot_q_dot))
+        inv_term = self.l_J_id.dot(self.l_J_id.T) + self.damp * np.eye(6)
+        q_ddot_d = self.l_J_id.T.dot(
+            la.solve(inv_term, w_X_ddot_d - J_dot_q_dot))
 
         # Dynamics model
         M = pin.crba(self.model, self.data, q)
@@ -224,14 +225,14 @@ class Environment(Node):
 
         # gain matrices
         Kx_I_cart = np.eye(6)
-        Kp_cart = 100.0 * Kx_I_cart
+        Kp_cart = 200.0 * Kx_I_cart
         Kd_cart = 2.0 * np.sqrt(Kp_cart)  # critically damped
 
         # joint name
-        joint_name = "arm_right_7_joint"
+        self.joint_name = "arm_right_7_joint"
 
         self.cart_crtl = CartesianSpaceController(
-            self.robot, joint_name, Kp_cart, Kd_cart)
+            self.robot, self.joint_name, Kp_cart, Kd_cart)
 
         # initial hand transformation
         self.X_goal = pin.SE3.Identity()
@@ -275,13 +276,19 @@ class Environment(Node):
             self.tau = self.joint_crtl.update(q_t, dq_t, ddq_t)
             if self.t_homing == self.homing_duration:
                 self.cur_state = State.CART_SPLINE
+                id = self.robot._model.getJointId(self.joint_name)
+                X = self.robot.data().oMi[id]
+                self.X_goal = pin.SE3(X.rotation, X.translation)
         else:
             self.X_r = self.X_goal
             tau_joint = self.joint_crtl.update(
                 self.q_home, np.zeros_like(self.q_home), np.zeros_like(self.q_home))
+            # TODO: possible add spline trajectory?
             tau_cart = self.cart_crtl.update(
                 self.X_r, self.X_dot_r, self.X_ddot_r)
-            self.tau = tau_joint + tau_cart
+            N = np.eye(
+                self.q_home.shape[0]) - self.cart_crtl.l_J_id.T @ la.pinv(self.cart_crtl.l_J_id).T
+            self.tau = N @ tau_joint + tau_cart
 
         # command the robot
         self.robot.setActuatedJointTorques(self.tau)
@@ -299,10 +306,10 @@ class Environment(Node):
         vec = np.array([msg.pose.position.x,
                         msg.pose.position.y,
                         msg.pose.position.z,
-                        msg.pose.orientation.w,
                         msg.pose.orientation.x,
                         msg.pose.orientation.y,
-                        msg.pose.orientation.z])
+                        msg.pose.orientation.z,
+                        msg.pose.orientation.w])
         self.X_goal = pin.XYZQUATToSE3(vec)
 
 

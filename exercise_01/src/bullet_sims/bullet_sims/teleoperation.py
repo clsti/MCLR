@@ -31,6 +31,7 @@ class InteractiveMarkerNode(Node):
 
     def get_trans(self):
         # retrive the 'arm_right_7_link' wrt 'base_link' transformation
+        # TODO: only activate when trigger for homing position (i.e. trigger for homing position)
         if self.tf_buffer._getFrameStrings() and self.trans is None:
             self.trans = self.tf_buffer.lookup_transform(
                 self.to_frame,
