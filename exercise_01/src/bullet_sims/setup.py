@@ -23,7 +23,9 @@ setup(
             't2_temp = bullet_sims.t2_temp:run',
             't21 = bullet_sims.t21:run',
             't22 = bullet_sims.t22:run',
-            't23 = bullet_sims.t23:main'
+            't23 = bullet_sims.t23:main',
+            't3_main = bullet_sims.t3_main:main',
+            'teleoperation = bullet_sims.teleoperation:main'
         ],
     },
 )

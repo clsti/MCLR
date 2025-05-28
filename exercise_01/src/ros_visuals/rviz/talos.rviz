@@ -581,6 +581,15 @@ Visualization Manager:
             {}
       Update Interval: 0
       Value: true
+    - Class: rviz_default_plugins/InteractiveMarkers
+      Enable Transparency: true
+      Enabled: true
+      Interactive Markers Namespace: /marker_server
+      Name: InteractiveMarkers
+      Show Axes: false
+      Show Descriptions: true
+      Show Visual Aids: false
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -627,7 +636,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 4.822695255279541
+      Distance: 1.6975886821746826
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -663,5 +672,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 1998
-  X: 1335
-  Y: 378
+  X: 1303
+  Y: 346
