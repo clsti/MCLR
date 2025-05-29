@@ -23,11 +23,12 @@ class CageTFBroadcaster(Node):
         self.v = np.array([0.1, 0, 0])  # linear velocity
         self.omega = np.array([0, 0.05, 0.2])  # angular velocity
         self.H_iterator = pin.SE3(np.eye(3), np.array(
-            [0, 0, 2]))  # current transformation matrix
+            [0, 0, 2]))  # initial transformation matrix
 
+        # Callback timer
         self.timer = self.create_timer(self.dt, self.timer_callback)
 
-        # Frame names
+        # Cage frame names
         self.frames = {
             "world": "world",
             "reference": "center",
@@ -35,7 +36,7 @@ class CageTFBroadcaster(Node):
                     "corner_5", "corner_6", "corner_7", "corner_8", ]
         }
 
-        # Create cage
+        # Build cage
         self.cage_tfs = self.build_cage()
 
         # Publisher for marker
@@ -45,11 +46,9 @@ class CageTFBroadcaster(Node):
         # Marker point parameters
         self.c1_point = {
             "ref_frame": "corner_1",
-            "id": 1,
-            "coords": np.array([0.2, 0.3, 0.1])
-        }
-        self.world_point = {
-            "ref_frame": "world"
+            "ref_id": 1,
+            "coords": np.array([0.2, 0.3, 0.1]),
+            "target_frame": "world"
         }
 
         # Marker colors
@@ -68,29 +67,21 @@ class CageTFBroadcaster(Node):
     def get_translation_vector(self, t_x, t_y, t_z):
         return np.array([t_x, t_y, t_z])
 
-    def create_SE3_transformations(self, roll, pitch, yaw, t_x, t_y, t_z):
+    def to_SE3(self, roll, pitch, yaw, t_x, t_y, t_z):
         return pin.SE3(
             self.get_rotation_matrix(roll, pitch, yaw),
             self.get_translation_vector(t_x, t_y, t_z))
 
     def build_cage(self):
-        H_0 = self.create_SE3_transformations(0, 0, 0, 0, 0, 0)
-        H_1 = self.create_SE3_transformations(
-            0, 0, 0, -self.l_cage, -self.w_cage, -self.h_cage)
-        H_2 = self.create_SE3_transformations(
-            0, 0, 90, self.l_cage, -self.w_cage, -self.h_cage)
-        H_3 = self.create_SE3_transformations(
-            0, 0, 180, self.l_cage, self.w_cage, -self.h_cage)
-        H_4 = self.create_SE3_transformations(
-            0, 0, 270, -self.l_cage, self.w_cage, -self.h_cage)
-        H_5 = self.create_SE3_transformations(
-            0, 180, 270, -self.l_cage, -self.w_cage, self.h_cage)
-        H_6 = self.create_SE3_transformations(
-            0, 180, 0, self.l_cage, -self.w_cage, self.h_cage)
-        H_7 = self.create_SE3_transformations(
-            0, 180, 90, self.l_cage, self.w_cage, self.h_cage)
-        H_8 = self.create_SE3_transformations(
-            180, 0, 0, -self.l_cage, self.w_cage, self.h_cage)
+        H_0 = self.to_SE3(0, 0, 0, 0, 0, 0)
+        H_1 = self.to_SE3(0, 0, 0, -self.l_cage, -self.w_cage, -self.h_cage)
+        H_2 = self.to_SE3(0, 0, 90, self.l_cage, -self.w_cage, -self.h_cage)
+        H_3 = self.to_SE3(0, 0, 180, self.l_cage, self.w_cage, -self.h_cage)
+        H_4 = self.to_SE3(0, 0, 270, -self.l_cage, self.w_cage, -self.h_cage)
+        H_5 = self.to_SE3(0, 180, 270, -self.l_cage, -self.w_cage, self.h_cage)
+        H_6 = self.to_SE3(0, 180, 0, self.l_cage, -self.w_cage, self.h_cage)
+        H_7 = self.to_SE3(0, 180, 90, self.l_cage, self.w_cage, self.h_cage)
+        H_8 = self.to_SE3(180, 0, 0, -self.l_cage, self.w_cage, self.h_cage)
 
         # Create an array of SE3 transformations
         array_SE3 = [H_0, H_1, H_2, H_3, H_4, H_5, H_6, H_7, H_8]
@@ -165,7 +156,7 @@ class CageTFBroadcaster(Node):
         t = self.H_iterator.translation
         R_new = self.integrate_rotations(R, self.dt, self.omega)
         T_new = self.integrate_velocity(t, self.v, self.dt, R_new)
-        # TODO: ASK HERE?
+
         H_iterator = pin.SE3(R_new, T_new)
 
         self.H_iterator = self.H_iterator * \
@@ -178,17 +169,17 @@ class CageTFBroadcaster(Node):
         for i, id in enumerate(self.frames["ids"]):
             self.broadcast_tf(self.cage_tfs[i+1], self.frames["reference"], id)
 
-        # Publish and calculate markers
-        self.pub_visualization_marker(
-            self.pub_marker_c1_p, self.c1_point["ref_frame"],
-            self.c1_point["coords"], self.color_orange)
-
-        center_point = self.cage_tfs[self.c1_point["id"]].act(
+        # Transform point in corner frame to world frame
+        center_point = self.cage_tfs[self.c1_point["ref_id"]].act(
             self.c1_point["coords"])
         world_point = self.H_iterator.act(center_point)
 
+        # Publish markers
         self.pub_visualization_marker(
-            self.pub_marker_w_p, self.world_point["ref_frame"],
+            self.pub_marker_c1_p, self.c1_point["ref_frame"],
+            self.c1_point["coords"], self.color_orange)
+        self.pub_visualization_marker(
+            self.pub_marker_w_p, self.c1_point["target_frame"],
             world_point, self.color_green)
 
 

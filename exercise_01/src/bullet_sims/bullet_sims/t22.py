@@ -63,6 +63,7 @@ robot = Robot(simulator,            # The Pybullet wrapper
               useFixedBase=False,   # Fixed base or not
               verbose=True)         # Printout details
 
+# get data
 data = robot._model.createData()
 
 pin.ccrba(robot._model, data, robot.q(), robot.v())

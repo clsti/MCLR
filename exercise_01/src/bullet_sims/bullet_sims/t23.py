@@ -65,7 +65,7 @@ class RobotSimulator(Node):
         self.simulator = PybulletWrapper(sim_rate=1000)
 
         # Create Pybullet-Pinocchio map
-        self.robot = Robot(self.simulator,            # The Pybullet wrapper
+        self.robot = Robot(self.simulator,       # The Pybullet wrapper
                            urdf,                 # Robot descriptor
                            model,                # Pinocchio model
                            [0, 0, z_init],       # Floating base initial position
@@ -75,6 +75,7 @@ class RobotSimulator(Node):
                            useFixedBase=False,   # Fixed base or not
                            verbose=True)         # Printout details
 
+        # get data
         data = self.robot._model.createData()
 
         pin.ccrba(self.robot._model, data, self.robot.q(), self.robot.v())

@@ -23,6 +23,7 @@ class InteractiveMarkerNode(Node):
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
 
+        # Frames for transformation
         self.from_frame = "arm_right_7_link"
         self.to_frame = "base_link"
 

@@ -101,7 +101,6 @@ class JointSpaceController:
     def update(self, q_r, q_r_dot, q_r_ddot):
         # Compute jointspace torque, return torque
 
-        # pin.ccrba(self.robot._model, data, self.robot.q(), self.robot.v())
         M = pin.crba(self.model, self.data, self.robot.q())
         h = pin.nonLinearEffects(self.model, self.data,
                                  self.robot.q(), self.robot.v())
@@ -132,7 +131,6 @@ class CartesianSpaceController:
     def update(self, X_r, X_dot_r, X_ddot_r):
         # compute cartesian control torque, return torque
 
-        # Inverse dynamics control
         q = self.robot.q()
         q_dot = self.robot.v()
 
@@ -268,17 +266,22 @@ class Environment(Node):
         if self.cur_state == State.JOINT_SPLINE:
             self.t_homing += dt
             self.t_homing = np.clip(self.t_homing, 0.0, self.homing_duration)
+
+            # create spline
             q_t = np.array([spline(self.t_homing) for spline in self.splines])
             dq_t = np.array([spline.derivative()(self.t_homing)
                              for spline in self.splines])
             ddq_t = np.array([spline.derivative(nu=2)(self.t_homing)
                               for spline in self.splines])
+
             self.tau = self.joint_crtl.update(q_t, dq_t, ddq_t)
+
+            # Switch joint to cartesian control
             if self.t_homing == self.homing_duration:
                 self.cur_state = State.CART_SPLINE
                 id = self.robot._model.getJointId(self.joint_name)
-                X = self.robot.data().oMi[id]
-                self.X_goal = pin.SE3(X.rotation, X.translation)
+                self.X_goal = self.robot.data().oMi[id]
+
         else:
             self.X_r = self.X_goal
             tau_joint = self.joint_crtl.update(
@@ -286,8 +289,11 @@ class Environment(Node):
             # TODO: possible add spline trajectory?
             tau_cart = self.cart_crtl.update(
                 self.X_r, self.X_dot_r, self.X_ddot_r)
-            N = np.eye(
-                self.q_home.shape[0]) - self.cart_crtl.l_J_id.T @ la.pinv(self.cart_crtl.l_J_id).T
+
+            # calculate nullspace projector
+            I = np.eye(self.q_home.shape[0])
+            N = I - self.cart_crtl.l_J_id.T @ la.pinv(self.cart_crtl.l_J_id).T
+
             self.tau = N @ tau_joint + tau_cart
 
         # command the robot
