@@ -17,10 +17,4 @@ def generate_launch_description():
             cmd=['rviz2', '-d', rviz_config_file],
             output='screen'
         ),
-        # Node(
-        #    package='ros_visuals',
-        #    executable='t11',
-        #    name='t11',
-        #    output='screen'
-        # )
     ])
