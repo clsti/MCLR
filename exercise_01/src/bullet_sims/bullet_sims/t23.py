@@ -78,19 +78,25 @@ class RobotSimulator(Node):
         # get data
         data = self.robot._model.createData()
 
-        pin.ccrba(self.robot._model, data, self.robot.q(), self.robot.v())
-        pin.crba(self.robot._model, data, self.robot.q())
-        pin.nonLinearEffects(self.robot._model, data,
-                             self.robot.q(), self.robot.v())
+        # Compute inertia matrix
+        M = pin.crba(self.robot._model, data, self.robot.q())
+        # Compute non-linear effects
+        h = pin.nonLinearEffects(
+            self.robot._model, data, self.robot.q(), self.robot.v())
 
         # print complete matrix
-        np.set_printoptions(threshold=np.inf, linewidth=np.inf)
+        np.set_printoptions(
+            threshold=np.inf,
+            linewidth=200,
+            suppress=True,
+            formatter={'float_kind': lambda x: f"{x:.1f}"}
+        )
 
         # Printout Inertia matrix & Non linear effects
         print("Inertia matrix:")
-        print(data.M)
+        print(M)
         print("Non linear effects:")
-        print(data.nle)
+        print(h)
 
         # Needed for compatibility
         self.simulator.addLinkDebugFrame(-1, -1)
