@@ -7,6 +7,7 @@ from tf2_ros import TransformException
 from interactive_markers.interactive_marker_server import InteractiveMarkerServer
 from visualization_msgs.msg import InteractiveMarker, InteractiveMarkerControl, Marker
 from geometry_msgs.msg import PoseStamped
+from std_msgs.msg import Bool
 
 
 class InteractiveMarkerNode(Node):
@@ -19,6 +20,13 @@ class InteractiveMarkerNode(Node):
         # Create a pose publisher
         self.pub = self.create_publisher(PoseStamped, "/marker_pose", 10)
 
+        # Creat subscriber for homing trigger
+        self.sub_home_trg = self.create_subscription(
+            Bool, "/trigger_homing", self.home_trigger, 10)
+
+        # Flag for homing position
+        self.homing_flag = False
+
         # tf listener
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
@@ -30,10 +38,13 @@ class InteractiveMarkerNode(Node):
         self.trans = None
         self.create_timer(1.0, self.get_trans)
 
+    def home_trigger(self, msg):
+        self.homing_flag = msg
+
     def get_trans(self):
         # retrive the 'arm_right_7_link' wrt 'base_link' transformation
-        # TODO: only activate when trigger for homing position (i.e. trigger for homing position)
-        if self.tf_buffer._getFrameStrings() and self.trans is None:
+        # initialize when robot in home position
+        if self.tf_buffer._getFrameStrings() and self.trans is None and self.homing_flag:
             self.trans = self.tf_buffer.lookup_transform(
                 self.to_frame,
                 self.from_frame,

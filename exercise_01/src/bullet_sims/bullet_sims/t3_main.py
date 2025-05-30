@@ -18,6 +18,7 @@ from rclpy.node import Node
 from rclpy.executors import ExternalShutdownException
 from sensor_msgs.msg import JointState
 from geometry_msgs.msg import PoseStamped
+from std_msgs.msg import Bool
 
 ################################################################################
 # utility functions
@@ -253,6 +254,10 @@ class Environment(Node):
         # Publish robot state every 0.01 s to ROS
         self.publish_period = 0.01
         self.pub = self.create_publisher(JointState, "/joint_states", 10)
+
+        # Publisher for home position trigger
+        self.pub_home_trg = self.create_publisher(Bool, "/trigger_homing", 10)
+
         self.timer = self.create_timer(self.publish_period, self.publish)
 
         # create joint state message
@@ -283,6 +288,11 @@ class Environment(Node):
                 self.cur_state = State.CART_SPLINE
                 id = self.robot._model.getJointId(self.joint_name)
                 self.X_goal = self.robot.data().oMi[id]
+
+                # send trigger for homing pose
+                msg_trg = Bool()
+                msg_trg.data = True
+                self.pub_home_trg.publish(msg_trg)
 
         else:
             self.X_r = self.X_goal
