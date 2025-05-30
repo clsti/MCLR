@@ -145,12 +145,14 @@ class CartesianSpaceController:
         l_X_dot_id = self.l_J_id @ q_dot
 
         # Compute the Cartesian desired acceleration
-        pos_err = w_X_id.translation - X_r.translation
-        rot_err = pin.log(w_X_id.rotation @ X_r.rotation.T)
-        err = np.hstack((pos_err, rot_err))
-        X_dot_dif = l_X_dot_id - X_dot_r
+        l_X_w = pin.SE3.Identity()
+        l_X_dot_r = l_X_w * w_X_id.act(pin.Motion(X_dot_r))
+        l_X_ddot_r = l_X_w * w_X_id.act(pin.Motion(X_ddot_r))
 
-        w_X_ddot_d = X_ddot_r - self.Kd @ X_dot_dif - self.Kp @ err
+        X_dif = pin.log(X_r.actInv(w_X_id)).vector
+        X_dot_dif = l_X_dot_id - l_X_dot_r
+
+        X_ddot_d = l_X_ddot_r - self.Kd @ X_dot_dif - self.Kp @ X_dif
 
         # Compute J_dot_q_dot
         J_dot_q_dot = pin.getClassicalAcceleration(self.model, self.data, id)
@@ -159,7 +161,7 @@ class CartesianSpaceController:
         # q_ddot_d = J_pinv @ (X_ddot_d - J_dot_q_dot)
         inv_term = self.l_J_id.dot(self.l_J_id.T) + self.damp * np.eye(6)
         q_ddot_d = self.l_J_id.T.dot(
-            la.solve(inv_term, w_X_ddot_d - J_dot_q_dot))
+            la.solve(inv_term, X_ddot_d - J_dot_q_dot))
 
         # Dynamics model
         M = pin.crba(self.model, self.data, q)
@@ -286,7 +288,7 @@ class Environment(Node):
             self.X_r = self.X_goal
             tau_joint = self.joint_crtl.update(
                 self.q_home, np.zeros_like(self.q_home), np.zeros_like(self.q_home))
-            # TODO: possible add spline trajectory?
+
             tau_cart = self.cart_crtl.update(
                 self.X_r, self.X_dot_r, self.X_ddot_r)
 
