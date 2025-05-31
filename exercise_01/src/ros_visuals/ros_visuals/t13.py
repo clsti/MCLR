@@ -41,8 +41,9 @@ class CageTFBroadcaster(Node):
         self.cage_tfs = self.build_cage()
 
         # Publisher for marker
-        self.pub_marker_c1_p = self.create_publisher(Marker, 'marker_c1_p', 10)
-        self.pub_marker_w_p = self.create_publisher(Marker, 'marker_w_p', 10)
+        self.pub_marker_c1_p = self.create_publisher(
+            Marker, '/marker_c1_p', 10)
+        self.pub_marker_w_p = self.create_publisher(Marker, '/marker_w_p', 10)
 
         # Marker point parameters
         self.c1_point = {
@@ -63,9 +64,9 @@ class CageTFBroadcaster(Node):
         c2w_W_tau = np.array([0.5, 0.1, 0.0])
         c2w_W_f = np.array([0.3, 0.0, 0.2])
         self.c2w = {
-            "pub_wrench_c3_W": self.create_publisher(WrenchStamped, 'wrench_c2w_c3_W', 10),
-            "pub_wrench_world_W": self.create_publisher(WrenchStamped, 'wrench_c2w_world_W', 10),
-            "pub_pin_wrench_world_W": self.create_publisher(WrenchStamped, 'pin_wrench_c2w_world_W', 10),
+            "pub_wrench_c3_W": self.create_publisher(WrenchStamped, '/wrench_c2w_c3_W', 10),
+            "pub_wrench_world_W": self.create_publisher(WrenchStamped, '/wrench_c2w_world_W', 10),
+            "pub_pin_wrench_world_W": self.create_publisher(WrenchStamped, '/pin_wrench_c2w_world_W', 10),
             "wrench": pin.Force(c2w_W_f, c2w_W_tau),
             "init_frame": "corner_3",
             "init_id": 3,
@@ -76,9 +77,9 @@ class CageTFBroadcaster(Node):
         w2c_W_tau = np.array([0.5, 0.1, 0.0])
         w2c_W_f = np.array([0.3, 0.0, 0.2])
         self.w2c = {
-            "pub_wrench_world_W": self.create_publisher(WrenchStamped, 'wrench_w2c_world_W', 10),
-            "pub_wrench_c2_W": self.create_publisher(WrenchStamped, 'wrench_w2c_c2_W', 10),
-            "pub_pin_wrench_c2_W": self.create_publisher(WrenchStamped, 'pin_wrench_w2c_c2_W', 10),
+            "pub_wrench_world_W": self.create_publisher(WrenchStamped, '/wrench_w2c_world_W', 10),
+            "pub_wrench_c2_W": self.create_publisher(WrenchStamped, '/wrench_w2c_c2_W', 10),
+            "pub_pin_wrench_c2_W": self.create_publisher(WrenchStamped, '/pin_wrench_w2c_c2_W', 10),
             "wrench": pin.Force(w2c_W_f, w2c_W_tau),
             "init_frame": "world",
             "target_frame": "corner_2",

@@ -22,8 +22,9 @@ class CageTFBroadcaster(Node):
         self.dt = 0.01  # time discretization
         self.v = np.array([0.1, 0, 0])  # linear velocity
         self.omega = np.array([0, 0.05, 0.2])  # angular velocity
+        # initial transformation matrix (such that world & cage do not align)
         self.H_iterator = pin.SE3(np.eye(3), np.array(
-            [0, 0, 2]))  # initial transformation matrix
+            [0, 0, 2]))
 
         # Callback timer
         self.timer = self.create_timer(self.dt, self.timer_callback)
@@ -40,8 +41,9 @@ class CageTFBroadcaster(Node):
         self.cage_tfs = self.build_cage()
 
         # Publisher for marker
-        self.pub_marker_c1_p = self.create_publisher(Marker, 'marker_c1_p', 10)
-        self.pub_marker_w_p = self.create_publisher(Marker, 'marker_w_p', 10)
+        self.pub_marker_c1_p = self.create_publisher(
+            Marker, '/marker_c1_p', 10)
+        self.pub_marker_w_p = self.create_publisher(Marker, '/marker_w_p', 10)
 
         # Marker point parameters
         self.c1_point = {

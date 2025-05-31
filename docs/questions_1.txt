@@ -10,13 +10,13 @@ a
   To align it with the other coordinate frames (z-axis downwards) and correspond to right hand rule:
   x (red) and y (green) axis have to be changed i.e.
   - y_5 axis in positive x_0 direction and
-  - x_5 axis in positive y_0 irection
+  - x_5 axis in positive y_0 direction
 
 
 5. Are they exactly the same in the rviz view? if you change the markers for cubes, what do you notice regarding the orientation and why is it?
   - the cubes do not (always) have the same orientation
-  - since the markers are only specified with a point, the orientation of the cube is aligned with the orientation of its respective reference frame
-  - Thus the cubes only match if the coordinate frame axes are aligned/parallel
+  - since the markers are only specified with a position, the orientation of the cube is aligned with the orientation of its respective reference frame
+  - Thus the cubes only match if the coordinate frame axes (corner - world) are parallel
 
 b
 
@@ -26,7 +26,7 @@ b
   - twist originated in the corner cage frame stays constant within the cage frame, varies in world frame due to motion of the cage and
     varies also transformed to the world frame
   - in general: 
-    - direction/orientation of the angular velocity vector stays the same (globally; locally it changes due to cage rotation; only rotation in transformation)
+    - direction/orientation of the angular velocity vector stays the same (globally; locally it changes due to cage rotation; only transformed with rotation)
     - linear velocity will differ based on its displacement (translation vector) from the rotation axis of the cage
 
 c
@@ -37,5 +37,5 @@ c
   - wrist originated in the corner cage frame stays constant within the cage frame, varies in world frame due to motion of the cage and
     varies also transformed to the world frame
   - in general:
-    - direction/orientation of the force vector stays the same (globally; locally it changes due to cage rotation; only rotation in transformation)
+    - direction/orientation of the force vector stays the same (globally; locally it changes due to cage rotation; only transformed with rotation)
     - torque will differ based on its displacement (translation vector) from the rotation axis of the cage

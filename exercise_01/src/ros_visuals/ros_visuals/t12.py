@@ -41,8 +41,9 @@ class CageTFBroadcaster(Node):
         self.cage_tfs = self.build_cage()
 
         # Publisher for marker
-        self.pub_marker_c1_p = self.create_publisher(Marker, 'marker_c1_p', 10)
-        self.pub_marker_w_p = self.create_publisher(Marker, 'marker_w_p', 10)
+        self.pub_marker_c1_p = self.create_publisher(
+            Marker, '/marker_c1_p', 10)
+        self.pub_marker_w_p = self.create_publisher(Marker, '/marker_w_p', 10)
 
         # Marker point parameters
         self.c1_point = {
@@ -63,9 +64,9 @@ class CageTFBroadcaster(Node):
         c2w_V_v = np.array([-0.4, 0.1, 0.0])
         c2w_V_omega = np.array([-0.3, 0.0, 0.1])
         self.c2w = {
-            "pub_twist_c3_V": self.create_publisher(TwistStamped, 'twist_c2w_c3_V', 10),
-            "pub_twist_world_V": self.create_publisher(TwistStamped, 'twist_c2w_world_V', 10),
-            "pub_pin_twist_world_V": self.create_publisher(TwistStamped, 'pin_twist_c2w_world_V', 10),
+            "pub_twist_c3_V": self.create_publisher(TwistStamped, '/twist_c2w_c3_V', 10),
+            "pub_twist_world_V": self.create_publisher(TwistStamped, '/twist_c2w_world_V', 10),
+            "pub_pin_twist_world_V": self.create_publisher(TwistStamped, '/pin_twist_c2w_world_V', 10),
             "twist": pin.Motion(c2w_V_v, c2w_V_omega),
             "init_frame": "corner_3",
             "init_id": 3,
@@ -76,9 +77,9 @@ class CageTFBroadcaster(Node):
         w2c_V_v = np.array([-0.4, 0.1, 0.0])
         w2c_V_omega = np.array([-0.3, 0.0, 0.1])
         self.w2c = {
-            "pub_twist_world_V": self.create_publisher(TwistStamped, 'twist_w2c_world_V', 10),
-            "pub_twist_c2_V": self.create_publisher(TwistStamped, 'twist_w2c_c2_V', 10),
-            "pub_pin_twist_c2_V": self.create_publisher(TwistStamped, 'pin_twist_w2c_c2_V', 10),
+            "pub_twist_world_V": self.create_publisher(TwistStamped, '/twist_w2c_world_V', 10),
+            "pub_twist_c2_V": self.create_publisher(TwistStamped, '/twist_w2c_c2_V', 10),
+            "pub_pin_twist_c2_V": self.create_publisher(TwistStamped, '/pin_twist_w2c_c2_V', 10),
             "twist": pin.Motion(w2c_V_v, w2c_V_omega),
             "init_frame": "world",
             "target_frame": "corner_2",
