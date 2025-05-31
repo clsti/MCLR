@@ -3,6 +3,7 @@ from rclpy.node import Node
 from tf2_ros import TransformListener
 from tf2_ros import Buffer
 from tf2_ros import TransformException
+from rclpy.executors import ExternalShutdownException
 
 from interactive_markers.interactive_marker_server import InteractiveMarkerServer
 from visualization_msgs.msg import InteractiveMarker, InteractiveMarkerControl, Marker
@@ -121,9 +122,13 @@ class InteractiveMarkerNode(Node):
 def main(args=None):
     rclpy.init(args=args)
     node = InteractiveMarkerNode()
-    rclpy.spin(node)
-    node.destroy_node()
-    rclpy.shutdown()
+    try:
+        rclpy.spin(node)
+    except (KeyboardInterrupt, ExternalShutdownException):
+        pass
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
 
 
 if __name__ == '__main__':
