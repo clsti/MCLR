@@ -1,6 +1,6 @@
 # Modeling and Control of Legged Robots - deliverable 1
 
-## instructions
+## Instructions
 * Create workspace
 ```sh
 mkdir ros2_ws && cd ros2_ws
