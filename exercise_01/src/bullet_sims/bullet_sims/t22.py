@@ -107,7 +107,7 @@ K_d = 0.4 * Kx_I
 q_d = np.zeros_like(q_actuated_home)
 
 # spline parameters
-time = 1
+time = 1.0
 t_step_size = 0.001 / time
 t_step = 0.0
 

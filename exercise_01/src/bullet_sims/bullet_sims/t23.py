@@ -140,8 +140,8 @@ class RobotSimulator(Node):
 
         # initialize timer (1kHz)
         self.timer = self.create_timer(0.001, self.sim_run)
-        # initialize timer (30Hz)
-        self.timer = self.create_timer(1.0/30.0, self.sim_pub)
+        # joint state publisher step parameter
+        self.t_30Hz = 0.0
 
     def spline_init_home(self, q_0, q_1, step):
         # spline from q_init to q_home
@@ -187,6 +187,11 @@ class RobotSimulator(Node):
 
         # command to the robot
         self.robot.setActuatedJointTorques(self.tau)
+
+        self.t_30Hz += 0.001
+        if self.t_30Hz >= 1.0/30.0:
+            self.sim_pub()
+            self.t_30Hz = 0.0
 
 
 def main(args=None):

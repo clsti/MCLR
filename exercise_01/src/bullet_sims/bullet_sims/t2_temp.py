@@ -63,20 +63,27 @@ robot = Robot(simulator,            # The Pybullet wrapper
               useFixedBase=False,   # Fixed base or not
               verbose=True)         # Printout details
 
+# get data
 data = robot._model.createData()
 
-pin.ccrba(robot._model, data, robot.q(), robot.v())
-pin.crba(robot._model, data, robot.q())
-pin.nonLinearEffects(robot._model, data, robot.q(), robot.v())
+# Compute inertia matrix
+M = pin.crba(robot._model, data, robot.q())
+# Compute non-linear effects
+h = pin.nonLinearEffects(robot._model, data, robot.q(), robot.v())
 
 # print complete matrix
-np.set_printoptions(threshold=np.inf, linewidth=np.inf)
+np.set_printoptions(
+    threshold=np.inf,
+    linewidth=200,
+    suppress=True,
+    formatter={'float_kind': lambda x: f"{x:.1f}"}
+)
 
 # Printout Inertia matrix & Non linear effects
 print("Inertia matrix:")
-print(data.M)
+print(M)
 print("Non linear effects:")
-print(data.nle)
+print(h)
 
 # Needed for compatibility
 simulator.addLinkDebugFrame(-1, -1)
