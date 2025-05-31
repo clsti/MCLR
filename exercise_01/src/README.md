@@ -1,9 +1,19 @@
 # Modeling and Control of Legged Robots - deliverable 1
 
-## Build with
+## instructions
+* Create workspace
+```sh
+mkdir ros2_ws && cd ros2_ws
+```
+* Copy src folder here and build with
 ```sh
 colcon build --symlink-install
 ```
+* Source workspace
+```sh
+source install/setup.bash
+```
+* Execute all commands in workspace
 
 ## Tutorial 1
 
