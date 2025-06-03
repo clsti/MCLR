@@ -6,13 +6,13 @@ from launch_ros.actions import Node
 def generate_launch_description():
     package_name = 'ros_visuals'
     rviz_config_file = os.path.join(
-        'src', package_name, 'rviz',
-        'talos.rviz'
+        'src', 'exercise_01', package_name,
+        'rviz', 'talos.rviz'
     )
 
     urdf_file = os.path.join(
-        'src', 'talos_description', 'robots',
-        'talos_reduced.urdf'
+        'src', 'exercise_01', 'talos_description',
+        'robots', 'talos_reduced.urdf'
     )
 
     with open(urdf_file, 'r') as urdf_file:

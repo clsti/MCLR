@@ -37,8 +37,8 @@ class State(Enum):
 class Talos(Robot):
     def __init__(self, simulator, q=None, verbose=True, useFixedBase=True):
         # For Talos robot
-        urdf = "src/talos_description/robots/talos_reduced.urdf"
-        path_meshes = "src/talos_description/meshes/../.."
+        urdf = "src/exercise_01/talos_description/robots/talos_reduced.urdf"
+        path_meshes = "src/exercise_01/talos_description/meshes/../.."
 
         # Initial condition for the simulator an model
         z_init = 1.15

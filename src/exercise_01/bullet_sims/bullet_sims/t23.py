@@ -15,12 +15,12 @@ class RobotSimulator(Node):
         super().__init__('robot_simulator')
 
         # For REEM-C robot
-        # urdf = "src/reemc_description/robots/reemc.urdf"
-        # path_meshes = "src/reemc_description/meshes/../.."
+        # urdf = "src/exercise_01/reemc_description/robots/reemc.urdf"
+        # path_meshes = "src/exercise_01/reemc_description/meshes/../.."
 
         # For Talos robot
-        urdf = "src/talos_description/robots/talos_reduced.urdf"
-        path_meshes = "src/talos_description/meshes/../.."
+        urdf = "src/exercise_01/talos_description/robots/talos_reduced.urdf"
+        path_meshes = "src/exercise_01/talos_description/meshes/../.."
 
         '''
         Talos

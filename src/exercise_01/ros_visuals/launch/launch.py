@@ -8,8 +8,8 @@ from launch_ros.actions import Node
 def generate_launch_description():
     package_name = 'ros_visuals'
     rviz_config_file = os.path.join(
-        'src', package_name, 'rviz',
-        'cage_rviz.rviz'
+        'src', 'exercise_01', package_name,
+        'rviz', 'cage_rviz.rviz'
     )
 
     return LaunchDescription([
