@@ -20,6 +20,9 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            'standing = body_control.01_standing:main',
+            'one_leg_stand = body_control.02_one_leg_stand:main',
+            'squatting = body_control.03_squatting:main'
         ],
     },
 )

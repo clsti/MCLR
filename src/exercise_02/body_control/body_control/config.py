@@ -4,16 +4,16 @@
 import os
 import pinocchio as pin
 import numpy as np
-import rospkg
+from ament_index_python.packages import get_package_share_directory
 
 ################################################################################
 # robot
 ################################################################################
 
-rospack = rospkg.RosPack()
-talos_description = rospack.get_path('talos_description')
-urdf = os.path.join(talos_description, "robots/talos_reduced_no_hands.urdf")
-path = os.path.join(talos_description, "meshes/../..")
+talos_description = get_package_share_directory('talos_description')
+urdf = os.path.join("exercise_02", talos_description,
+                    "robots/talos_reduced_no_hands.urdf")
+path = os.path.join("exercise_02", talos_description, "meshes/../..")
 
 dt = 0.001                                      # controller time step
 f_cntr = 1.0/dt                                 # controller freq
@@ -21,8 +21,10 @@ na = 30                                         # number of actuated
 
 # homing pose
 q_actuated_home = np.zeros(na)
-q_actuated_home[:6] = np.array([0.0004217227847487237, -0.00457389353360238, -0.44288825380502317, 0.9014217614029372, -0.4586176441428318, 0.00413219379047014])
-q_actuated_home[6:12] = np.array([-0.0004612402198835852, -0.0031162522884748967, -0.4426315354712109, 0.9014369887125069, -0.4588832011407824, 0.003546732694320376])
+q_actuated_home[:6] = np.array([0.0004217227847487237, -0.00457389353360238, -
+                               0.44288825380502317, 0.9014217614029372, -0.4586176441428318, 0.00413219379047014])
+q_actuated_home[6:12] = np.array([-0.0004612402198835852, -0.0031162522884748967, -
+                                 0.4426315354712109, 0.9014369887125069, -0.4588832011407824, 0.003546732694320376])
 q_home = np.hstack([np.array([0, 0, 0.9, 0, 0, 0, 1]), q_actuated_home])
 
 '''
@@ -48,7 +50,8 @@ lz = 0.                                 # foot sole height with respect to ankle
 f_mu = 0.3                              # friction coefficient
 f_fMin = 5.0                            # minimum normal force
 f_fMax = 1e6                            # maximum normal force
-contactNormal = np.array([0., 0., 1.])  # direction of the normal to the contact surface
+# direction of the normal to the contact surface
+contactNormal = np.array([0., 0., 1.])
 
 ################################################################################
 # foot print
@@ -72,10 +75,12 @@ w_am = 1e-4             # weight of angular momentum task
 w_foot = 1e-1           # weight of the foot motion task: here no motion
 w_hand = 1e-1           # weight of the hand motion task
 w_torso = 1             # weight torso orientation motion task
-w_feet_contact = 1e5    # weight of foot in contact (negative means infinite weight)
+# weight of foot in contact (negative means infinite weight)
+w_feet_contact = 1e5
 w_hand_contact = 1e5    # weight for hand in contact
 w_posture = 1e-3        # weight of joint posture task
-w_force_reg = 1e-5      # weight of force regularization task (note this is really important!)
+# weight of force regularization task (note this is really important!)
+w_force_reg = 1e-5
 w_torque_bounds = 1.0   # weight of the torque bounds: here no bounds
 w_joint_bounds = 0.0    # weight of the velocity bounds: here no bounds
 
@@ -89,12 +94,14 @@ kp_am = 10.0            # proportional gain of angular momentum task
 
 # proportional gain of joint posture task
 kp_posture = np.array([
-        10., 10., 10., 10., 10., 10.,           # left leg  #low gain on axis along y and knee
-        10., 10., 10., 10., 10., 10.,           # right leg #low gain on axis along y and knee
-        5000., 5000.,                           # torso really high to make them stiff
-        10., 10., 10., 10., 10., 10., 10.,      # right arm make the x direction soft
-        10., 10., 10., 10., 10., 10., 10.,      # left arm make the x direction soft
-        1000., 1000.                            # head
+    # left leg  #low gain on axis along y and knee
+    10., 10., 10., 10., 10., 10.,
+    # right leg #low gain on axis along y and knee
+    10., 10., 10., 10., 10., 10.,
+    5000., 5000.,                           # torso really high to make them stiff
+    10., 10., 10., 10., 10., 10., 10.,      # right arm make the x direction soft
+    10., 10., 10., 10., 10., 10., 10.,      # left arm make the x direction soft
+    1000., 1000.                            # head
 ])
 masks_posture = np.ones(na)                     # mask out joint (here none)
 
