@@ -121,6 +121,7 @@ class Environment(Node):
             useFixedBase=False)
 
         self.t_publish = 0.0
+        self.t_plot = 0.0
 
         # balance on one foot
         com_curr = self.tsid_wrapper.comState().value()
@@ -151,6 +152,23 @@ class Environment(Node):
         traj, _, _ = self.arm_circle(np.linspace(0, 1./self.arm_freq, num=100))
         self.simulator.addGlobalDebugTrajectory(
             traj[0, :], traj[1, :], traj[2, :])
+
+        # Plotting
+        self.plot_time = []
+        self.plot_tsid_pos = []
+        self.plot_tsid_vel = []
+        self.plot_tsid_acc = []
+        self.plot_gt_pos = []
+        self.plot_gt_vel = []
+        self.plot_gt_acc = []
+        self.plot_ref_pos = []
+        self.plot_ref_vel = []
+        self.plot_ref_acc = []
+
+        plt.ion()
+        self.fig_pos, self.axs_pos = plt.subplots(3, 1, figsize=(10, 8))
+        self.fig_vel, self.axs_vel = plt.subplots(3, 1, figsize=(10, 8))
+        self.fig_acc, self.axs_acc = plt.subplots(3, 1, figsize=(10, 8))
 
     def sine_wave_squat(self, t):
         z = self.wave_amp * np.sin(t * self.omega_squat)
@@ -245,6 +263,68 @@ class Environment(Node):
             T_b_w, _ = self.tsid_wrapper.baseState()
             self.robot.publish(T_b_w, tau_sol)
 
+        if DO_PLOT:
+            self.logging(t)
+            if t - self.t_plot > 5.0:
+                self.t_plot = t
+                self.plot()
+
+    def update_figure(self, axs, data_tsid, data_ref, data_sim=None, title=None):
+        labels = ['X', 'Y', 'Z']
+        t = np.array(self.plot_time)
+        ref = np.array(data_ref)
+        tsid = np.array(data_tsid)
+        sim = np.array(data_sim) if data_sim else None
+
+        for i in range(3):
+            axs[i].cla()
+            axs[i].plot(t, tsid[:, i], 'r--', label='tsid')
+            axs[i].plot(t, ref[:, i], 'b--', label='ref')
+            if sim is not None:
+                axs[i].plot(t, sim[:, i],
+                            'g--', label='sim')
+            axs[i].set_ylabel(f'{labels[i]}')
+            axs[i].set_title(f'{title} - {labels[i]}')
+            axs[i].legend()
+            axs[i].grid()
+
+    def logging(self, t):
+        # get data
+        self.plot_time.append(t)
+        com_tsid = self.tsid_wrapper.comState()
+        self.plot_tsid_pos.append(com_tsid.value())
+        self.plot_tsid_vel.append(com_tsid.derivative())
+        self.plot_tsid_acc.append(com_tsid.second_derivative())
+        gt_pos = self.robot.baseWorldPosition()
+        gt_vel = self.robot.baseWorldLinearVeloctiy()
+        # gt_acc = self.robot.baseWorldAcceleration()
+        self.plot_gt_pos.append(gt_pos)
+        self.plot_gt_vel.append(gt_vel)
+        # self.plot_gt_acc.append(gt_acc)
+        com_ref = self.tsid_wrapper.comReference()
+        self.plot_ref_pos.append(com_ref.value())
+        self.plot_ref_vel.append(com_ref.derivative())
+        self.plot_ref_acc.append(com_ref.second_derivative())
+
+    def plot(self):
+        self.update_figure(self.axs_pos, self.plot_tsid_pos,
+                           self.plot_ref_pos, self.plot_gt_pos, "Position")
+        self.update_figure(self.axs_vel, self.plot_tsid_vel,
+                           self.plot_ref_vel, self.plot_gt_vel, "Velocity")
+        self.update_figure(self.axs_acc, self.plot_tsid_acc,
+                           self.plot_ref_acc, None, "Acceleration")
+
+        self.fig_pos.tight_layout()
+        self.fig_vel.tight_layout()
+        self.fig_acc.tight_layout()
+
+        self.fig_pos.canvas.draw()
+        self.fig_vel.canvas.draw()
+        self.fig_acc.canvas.draw()
+
+        self.fig_pos.canvas.flush_events()
+        self.fig_vel.canvas.flush_events()
+        self.fig_acc.canvas.flush_events()
 
 ################################################################################
 # main
