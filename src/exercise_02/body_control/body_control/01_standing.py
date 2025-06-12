@@ -80,7 +80,7 @@ class Talos(Robot):
         tf_msg = TransformStamped()
         tf_msg.header.stamp = self.node.get_clock().now().to_msg()
         tf_msg.header.frame_id = "world"
-        tf_msg.child_frame_id = "base_link"
+        tf_msg.child_frame_id = self.baseName()
 
         tf_msg.transform.translation.x = T_b_w.translation[0]
         tf_msg.transform.translation.y = T_b_w.translation[1]
@@ -109,7 +109,10 @@ class Environment(Node):
         self.tsid_wrapper = TSIDWrapper(conf)
 
         # init Simulator
-        self.simulator = PybulletWrapper()
+        self.simulator = PybulletWrapper(sim_rate=conf.f_cntr)
+
+        q_init = np.hstack([np.array([0, 0, 1.15, 0, 0, 0, 1]),
+                           np.zeros_like(conf.q_actuated_home)])
 
         # init ROBOT
         self.robot = Talos(
@@ -117,7 +120,7 @@ class Environment(Node):
             conf.urdf,
             self.tsid_wrapper.model,
             self,
-            q=conf.q_home,
+            q=q_init,
             verbose=True,
             useFixedBase=False)
 

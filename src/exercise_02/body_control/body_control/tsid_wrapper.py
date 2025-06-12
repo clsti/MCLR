@@ -251,7 +251,7 @@ class TSIDWrapper:
         self.leftFootTask.setKd(
             2.0 * np.sqrt(self.conf.kp_foot) * np.array([1, 1, 1, 1, 1, 3]))
         self.trajLF = tsid.TrajectorySE3Constant("traj-left-foot", H_lf_ref)
-        # formulation.addMotionTask(self.leftFootTask, self.conf.w_foot, 1, 0.0)
+        formulation.addMotionTask(self.leftFootTask, self.conf.w_foot, 1, 0.0)
 
         # left foot reference
         T_lf_w = self.robot.framePosition(data, self.LF)
@@ -268,7 +268,7 @@ class TSIDWrapper:
         self.rightFootTask.setKd(
             2.0 * np.sqrt(self.conf.kp_foot) * np.array([1, 1, 1, 1, 1, 3]))
         self.trajRF = tsid.TrajectorySE3Constant("traj-right-foot", H_rf_ref)
-        # formulation.addMotionTask(self.rightFootTask, self.conf.w_foot, 1, 0.0)
+        formulation.addMotionTask(self.rightFootTask, self.conf.w_foot, 1, 0.0)
 
         # right foot reference
         T_rf_w = self.robot.framePosition(data, self.RF)
@@ -488,7 +488,7 @@ class TSIDWrapper:
         T_frame_w = self.robot.framePosition(data, self.base_id)
         v_frame_w = self.robot.frameVelocity(data, self.base_id)
         if dv is not None:
-            a_frame_w = self.torso_task.getAcceleration(dv)
+            a_frame_w = self.torsoTask.getAcceleration(dv)
             return T_frame_w, v_frame_w, a_frame_w
         return T_frame_w, v_frame_w
 
