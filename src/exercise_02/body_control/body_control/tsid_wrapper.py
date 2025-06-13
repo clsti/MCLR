@@ -290,7 +290,7 @@ class TSIDWrapper:
         T_lh_w = self.robot.framePosition(data, self.LH)
 
         self.trajLH = tsid.TrajectorySE3Constant("traj-left-hand", T_lh_w)
-        formulation.addMotionTask(self.leftHandTask, self.conf.w_hand, 1, 0.0)
+        # formulation.addMotionTask(self.leftHandTask, self.conf.w_hand, 1, 0.0)
 
         self.lh_ref = create_sample(T_lh_w)
         self.leftHandTask.setReference(self.lh_ref)
@@ -309,8 +309,8 @@ class TSIDWrapper:
         self.RH = self.robot.model().getFrameId(self.conf.rh_frame_name)
         T_rh_w = self.robot.framePosition(data, self.RH)
 
-        self.trajRH = tsid.TrajectorySE3Constant("right-left-hand", T_rh_w)
-        formulation.addMotionTask(self.leftHandTask, self.conf.w_hand, 1, 0.0)
+        self.trajRH = tsid.TrajectorySE3Constant("right-right-hand", T_rh_w)
+        # formulation.addMotionTask(self.rightHandTask, self.conf.w_hand, 1, 0.0)
 
         self.rh_ref = create_sample(T_rh_w)
         self.rightHandTask.setReference(self.rh_ref)

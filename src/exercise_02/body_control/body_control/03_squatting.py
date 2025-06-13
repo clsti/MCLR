@@ -157,21 +157,22 @@ class Environment(Node):
             traj[0, :], traj[1, :], traj[2, :])
 
         # Plotting
-        self.plot_time = []
-        self.plot_tsid_pos = []
-        self.plot_tsid_vel = []
-        self.plot_tsid_acc = []
-        self.plot_gt_pos = []
-        self.plot_gt_vel = []
-        self.plot_gt_acc = []
-        self.plot_ref_pos = []
-        self.plot_ref_vel = []
-        self.plot_ref_acc = []
+        if DO_PLOT:
+            self.plot_time = []
+            self.plot_tsid_pos = []
+            self.plot_tsid_vel = []
+            self.plot_tsid_acc = []
+            self.plot_gt_pos = []
+            self.plot_gt_vel = []
+            self.plot_gt_acc = []
+            self.plot_ref_pos = []
+            self.plot_ref_vel = []
+            self.plot_ref_acc = []
 
-        plt.ion()
-        self.fig_pos, self.axs_pos = plt.subplots(3, 1, figsize=(10, 8))
-        self.fig_vel, self.axs_vel = plt.subplots(3, 1, figsize=(10, 8))
-        self.fig_acc, self.axs_acc = plt.subplots(3, 1, figsize=(10, 8))
+            plt.ion()
+            self.fig_pos, self.axs_pos = plt.subplots(3, 1, figsize=(10, 8))
+            self.fig_vel, self.axs_vel = plt.subplots(3, 1, figsize=(10, 8))
+            self.fig_acc, self.axs_acc = plt.subplots(3, 1, figsize=(10, 8))
 
     def sine_wave_squat(self, t):
         z = self.wave_amp * np.sin(t * self.omega_squat)
@@ -242,14 +243,13 @@ class Environment(Node):
 
         if t > self.t_start_arm_motion:
             if not self.arm_motion:
-                # add right hand task
-                self.tsid_wrapper.formulation.addMotionTask(
-                    self.tsid_wrapper.rightFootTask, conf.w_foot, 1, 0.0)
                 # set orientation gains to zero
                 self.tsid_wrapper.rightHandTask.setKp(
                     100*np.array([1, 1, 1, 0, 0, 0]))
                 self.tsid_wrapper.rightHandTask.setKd(
                     2.0*np.sqrt(100) * np.array([1, 1, 1, 0, 0, 0]))
+                # add right hand task
+                self.tsid_wrapper.add_motion_RH()
 
                 self.arm_motion = True
 
