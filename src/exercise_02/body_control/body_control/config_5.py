@@ -109,3 +109,17 @@ masks_posture = np.ones(na)                     # mask out joint (here none)
 
 tau_max_scaling = 1.45          # scaling factor of torque bounds
 v_max_scaling = 0.8             # scaling velocity bounds
+
+################################################################################
+# Balance Control
+################################################################################
+
+# Ankle strategy
+x_ref = np.array([0.0, 0.0, 0.0])
+p_ref = np.array([0.0, 0.0, 0.95])
+kx_ankle = np.diag([5.0, 5.0, 0.0])
+kp_ankle = np.diag([0.1, 0.1, 0.0])
+
+# Hip strategy
+r_ref = np.array([0.0, 0.0, 0.0])
+kgamma_hip = 5.0 * np.diag([1.0, 1.0, 0.0])

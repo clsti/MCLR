@@ -17,6 +17,7 @@ from simulator.pybullet_wrapper import PybulletWrapper
 from simulator.robot import Robot
 
 # robot and controller
+import tsid
 from body_control.tsid_wrapper import TSIDWrapper
 import body_control.config_5 as conf
 
@@ -162,6 +163,60 @@ class ExtPushForce():
 
 
 ################################################################################
+# External pushing force
+################################################################################
+
+class BalanceController():
+    def __init__(self, robot, tsid_wrapper, verbose=True):
+        '''
+        Balance controller with ankle & hip strategy
+        '''
+        self.robot = robot
+        self.tsid_wrapper = tsid_wrapper
+        self.verbose = verbose
+
+        # ankle strategy parameters
+        self.x_ref = conf.x_ref
+        self.p_ref = conf.p_ref
+        self.K_x_ankle = conf.kx_ankle
+        self.K_p_ankle = conf.kp_ankle
+
+        # hip strategy parameters
+        self.r_ref = conf.r_ref
+        self.K_gamma_hip = conf.kgamma_hip
+
+    def ankle_strategy(self, x_d, p, x_ref_dot=None):
+        '''
+        Ankle balance strategy for small disturbances
+        '''
+
+        if x_ref_dot is None:
+            # standing condition
+            x_ref_dot = np.zeros_like(p)
+
+        d_x = x_d - self.x_ref
+        d_p = p - self.p_ref
+
+        # x_d_dot: new desired velocity for CoM
+        x_d_dot = x_ref_dot - self.K_x_ankle @ d_x + self.K_p_ankle @ d_p
+
+        # TODO: How to use x_d_dot?
+        self.tsid_wrapper.setComRefState(self.p_ref, x_d_dot)
+
+    def hip_strategy(self, r):
+        '''
+        Hip balance strategy for higher disturbances
+        '''
+        # Gamma_d: desired angular momentum
+        Gamma_d = self.K_gamma_hip @ (r - self.r_ref)
+
+        # set angular momentum (am) task
+        am_traj = tsid.TrajectorySample(3)
+        am_traj.value(Gamma_d)
+        self.tsid_wrapper.amTask.setReference(am_traj)
+
+
+################################################################################
 # Application
 ################################################################################
 
@@ -189,16 +244,20 @@ class Environment(Node):
             verbose=True,
             useFixedBase=False)
 
+        # init Balance Controller
+        self.balance_crtl = BalanceController(self.robot, self.tsid_wrapper)
+
         # init external forces
-        f_right = np.array([0.0, -50.0, 0.0])
-        f_left = np.array([0.0, 50.0, 0.0])
-        f_back = np.array([30.0, 0.0, 0.0])
+        force = 55.0
+        f_right = force * np.array([0.0, -1.0, 0.0])
+        f_left = force * np.array([0.0, 1.0, 0.0])
+        f_back = force * np.array([1.0, 0.0, 0.0])
         self.f_ext_right = ExtPushForce(
-            self.robot, self.simulator, f_right, 2.0, 0.8)
+            self.robot, self.simulator, f_right, 4.0, 0.25)
         self.f_ext_left = ExtPushForce(
-            self.robot, self.simulator, f_left, 6.0, 0.8)
+            self.robot, self.simulator, f_left, 4.2, 0.25)
         self.f_ext_back = ExtPushForce(
-            self.robot, self.simulator, f_back, 10.0, 0.5)
+            self.robot, self.simulator, f_back, 4.1, 0.3)
 
         # add force-torque sensors at ankles
         pb.enableJointForceTorqueSensor(
@@ -480,15 +539,20 @@ class Environment(Node):
         self.f_ext_left.apply_force(t)
         self.f_ext_back.apply_force(t)
 
+        # compute estimates
+        self.compute_estimates()
+
+        # balance strategy
+        # self.balance_crtl.ankle_strategy(
+        #    self.robot.baseCoMPosition(), self.get_zmp())
+        self.balance_crtl.hip_strategy(self.get_cmp())
+
         # update TSID controller
         tau_sol, _ = self.tsid_wrapper.update(
             self.robot.q(), self.robot.v(), t)
 
         # command to the robot
         self.robot.setActuatedJointTorques(tau_sol)
-
-        # compute estimates
-        self.compute_estimates()
 
         # logging
         self.logging(t)
