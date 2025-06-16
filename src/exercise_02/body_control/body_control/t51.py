@@ -210,6 +210,12 @@ class Environment(Node):
 
         self.t_publish = 0.0
 
+        # current estimates
+        self.zmp_curr_est = None
+        self.cmp_curr_est = None
+        self.cp_curr_est = None
+        self.f_total = None
+
         # logging
         if USE_MAXLEN:
             self.time = deque(maxlen=MAXLEN)
@@ -374,22 +380,21 @@ class Environment(Node):
             p_x = (p_xR * f_zR + p_xL * f_zL) / (f_zR + f_zL)
             p_y = (p_yR * f_zR + p_yL * f_zL) / (f_zR + f_zL)
             p_z = 0
-            p = np.array([p_x, p_y, p_z])
-            f = wr_sole.linear + wl_sole.linear
+            self.zmp_curr_est = np.array([p_x, p_y, p_z])
+            self.f_total = wr_sole.linear + wl_sole.linear
         else:
             # single support
             if f_zR > f_zL:
-                p = p_R
-                f = wr_sole.linear
+                self.zmp_curr_est = p_R
+                self.f_total = wr_sole.linear
             else:
-                p = p_L
-                f = wl_sole.linear
-
-        return p, f
+                self.zmp_curr_est = p_L
+                self.f_total = wl_sole.linear
 
     def estimate_CMP(self):
         # estimate the Centroidal Moment Pivot
-        p_zmp, f = self.estimate_ZMP()
+        p_zmp = self.get_zmp()
+        f = self.get_f_total()
         X_x, X_y, X_z = p_zmp
         f_x, f_y, f_z = f
 
@@ -397,7 +402,7 @@ class Environment(Node):
         r_y = X_y - f_y/f_z * X_z
         r_z = 0
 
-        return np.array([r_x, r_y, r_z])
+        self.cmp_curr_est = np.array([r_x, r_y, r_z])
 
     def estimate_CP(self):
         # estimate the Capture point (CP) / Divergent Component of Motion (DCM)
@@ -406,15 +411,31 @@ class Environment(Node):
         x_p_dot = self.robot.baseCoMVelocity()
         omega = np.sqrt(g/x_CoM[2])
 
-        Xi = x_p + x_p_dot/omega
+        self.cp_curr_est = x_p + x_p_dot/omega
 
-        return Xi
+    def compute_estimates(self):
+        # compute all estimates
+        self.estimate_ZMP()
+        self.estimate_CMP()
+        self.estimate_CP()
+
+    def get_zmp(self):
+        return self.zmp_curr_est
+
+    def get_cmp(self):
+        return self.cmp_curr_est
+
+    def get_cp(self):
+        return self.cp_curr_est
+
+    def get_f_total(self):
+        return self.f_total
 
     def logging(self, t):
         # log the x and y components of ground reference points and CoM
-        p_zmp, _ = self.estimate_ZMP()
-        p_cmp = self.estimate_CMP()
-        p_cp = self.estimate_CP()
+        p_zmp = self.get_zmp()
+        p_cmp = self.get_cmp()
+        p_cp = self.get_cp()
         p_com = self.robot.baseCoMPosition()
 
         self.time.append(t)
@@ -460,6 +481,9 @@ class Environment(Node):
 
         # command to the robot
         self.robot.setActuatedJointTorques(tau_sol)
+
+        # compute estimates
+        self.compute_estimates()
 
         # logging
         self.logging(t)
