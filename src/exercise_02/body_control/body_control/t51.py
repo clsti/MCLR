@@ -3,7 +3,7 @@ import numpy as np
 from numpy import nan
 from numpy.linalg import norm as norm
 import matplotlib.pyplot as plt
-from scipy.constants import G
+from scipy.constants import g
 from pyqtgraph.Qt import QtWidgets, QtCore
 import pyqtgraph as pg
 from collections import deque
@@ -404,7 +404,7 @@ class Environment(Node):
         x_CoM = self.robot.baseCoMPosition()
         x_p = np.array([x_CoM[0], x_CoM[1], 0.0])
         x_p_dot = self.robot.baseCoMVelocity()
-        omega = np.sqrt(G/x_CoM[2])
+        omega = np.sqrt(g/x_CoM[2])
 
         Xi = x_p + x_p_dot/omega
 
