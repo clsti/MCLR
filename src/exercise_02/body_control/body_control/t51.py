@@ -32,6 +32,8 @@ from geometry_msgs.msg import TransformStamped
 # settings
 ################################################################################
 
+THREADING = True
+DO_PLOT = True
 USE_MAXLEN = True
 MAXLEN = 500
 
@@ -240,71 +242,74 @@ class Environment(Node):
 
         # plotting (PyQtGraph UI setup)
         # PyQt App setup
-        self.app = QtWidgets.QApplication([])
-        self.win = pg.GraphicsLayoutWidget(
-            show=True, title="ZMP/CMP/CP/CoM Plots")
-        self.win.resize(1200, 800)
+        if DO_PLOT:
+            self.app = QtWidgets.QApplication([])
+            self.win = pg.GraphicsLayoutWidget(
+                show=True, title="ZMP/CMP/CP/CoM Plots")
+            self.win.resize(1200, 800)
 
-        # === X Component Plots ===
-        self.plot_zmp_x = self.win.addPlot(
-            title="ZMP X Over Time", row=0, col=0)
-        self.plot_zmp_x.setLabels(left='X Value', bottom='Time (s)')
-        self.plot_zmp_x.addLegend()
-        self.plot_zmp_x.showGrid(x=True, y=True)
-        self.curve_zmp_x = self.plot_zmp_x.plot(pen='r', name='ZMP X')
+            # === X Component Plots ===
+            self.plot_zmp_x = self.win.addPlot(
+                title="ZMP X Over Time", row=0, col=0)
+            self.plot_zmp_x.setLabels(left='X Value', bottom='Time (s)')
+            self.plot_zmp_x.addLegend()
+            self.plot_zmp_x.showGrid(x=True, y=True)
+            self.curve_zmp_x = self.plot_zmp_x.plot(pen='r', name='ZMP X')
 
-        self.plot_cmp_x = self.win.addPlot(
-            title="CMP X Over Time", row=0, col=1)
-        self.plot_cmp_x.setLabels(left='X Value', bottom='Time (s)')
-        self.plot_cmp_x.addLegend()
-        self.plot_cmp_x.showGrid(x=True, y=True)
-        self.curve_cmp_x = self.plot_cmp_x.plot(pen='g', name='ZMP X')
+            self.plot_cmp_x = self.win.addPlot(
+                title="CMP X Over Time", row=0, col=1)
+            self.plot_cmp_x.setLabels(left='X Value', bottom='Time (s)')
+            self.plot_cmp_x.addLegend()
+            self.plot_cmp_x.showGrid(x=True, y=True)
+            self.curve_cmp_x = self.plot_cmp_x.plot(pen='g', name='ZMP X')
 
-        self.plot_cp_x = self.win.addPlot(title="CP X Over Time", row=1, col=0)
-        self.plot_cp_x.setLabels(left='X Value', bottom='Time (s)')
-        self.plot_cp_x.addLegend()
-        self.plot_cp_x.showGrid(x=True, y=True)
-        self.curve_cp_x = self.plot_cp_x.plot(pen='b', name='CP X')
+            self.plot_cp_x = self.win.addPlot(
+                title="CP X Over Time", row=1, col=0)
+            self.plot_cp_x.setLabels(left='X Value', bottom='Time (s)')
+            self.plot_cp_x.addLegend()
+            self.plot_cp_x.showGrid(x=True, y=True)
+            self.curve_cp_x = self.plot_cp_x.plot(pen='b', name='CP X')
 
-        self.plot_com_x = self.win.addPlot(
-            title="CoM X Over Time", row=1, col=1)
-        self.plot_com_x.setLabels(left='X Value', bottom='Time (s)')
-        self.plot_com_x.addLegend()
-        self.plot_com_x.showGrid(x=True, y=True)
-        self.curve_com_x = self.plot_com_x.plot(pen='m', name='CoM X')
+            self.plot_com_x = self.win.addPlot(
+                title="CoM X Over Time", row=1, col=1)
+            self.plot_com_x.setLabels(left='X Value', bottom='Time (s)')
+            self.plot_com_x.addLegend()
+            self.plot_com_x.showGrid(x=True, y=True)
+            self.curve_com_x = self.plot_com_x.plot(pen='m', name='CoM X')
 
-        # === Y Component Plots ===
-        self.plot_zmp_y = self.win.addPlot(
-            title="ZMP Y Over Time", row=2, col=0)
-        self.plot_zmp_y.setLabels(left='Y Value', bottom='Time (s)')
-        self.plot_zmp_y.addLegend()
-        self.plot_zmp_y.showGrid(x=True, y=True)
-        self.curve_zmp_y = self.plot_zmp_y.plot(pen='r', name='ZMP Y')
+            # === Y Component Plots ===
+            self.plot_zmp_y = self.win.addPlot(
+                title="ZMP Y Over Time", row=2, col=0)
+            self.plot_zmp_y.setLabels(left='Y Value', bottom='Time (s)')
+            self.plot_zmp_y.addLegend()
+            self.plot_zmp_y.showGrid(x=True, y=True)
+            self.curve_zmp_y = self.plot_zmp_y.plot(pen='r', name='ZMP Y')
 
-        self.plot_cmp_y = self.win.addPlot(
-            title="CMP Y Over Time", row=2, col=1)
-        self.plot_cmp_y.setLabels(left='Y Value', bottom='Time (s)')
-        self.plot_cmp_y.addLegend()
-        self.plot_cmp_y.showGrid(x=True, y=True)
-        self.curve_cmp_y = self.plot_cmp_y.plot(pen='g', name='ZMP Y')
+            self.plot_cmp_y = self.win.addPlot(
+                title="CMP Y Over Time", row=2, col=1)
+            self.plot_cmp_y.setLabels(left='Y Value', bottom='Time (s)')
+            self.plot_cmp_y.addLegend()
+            self.plot_cmp_y.showGrid(x=True, y=True)
+            self.curve_cmp_y = self.plot_cmp_y.plot(pen='g', name='ZMP Y')
 
-        self.plot_cp_y = self.win.addPlot(title="CP Y Over Time", row=3, col=0)
-        self.plot_cp_y.setLabels(left='Y Value', bottom='Time (s)')
-        self.plot_cp_y.addLegend()
-        self.plot_cp_y.showGrid(x=True, y=True)
-        self.curve_cp_y = self.plot_cp_y.plot(pen='b', name='CP Y')
+            self.plot_cp_y = self.win.addPlot(
+                title="CP Y Over Time", row=3, col=0)
+            self.plot_cp_y.setLabels(left='Y Value', bottom='Time (s)')
+            self.plot_cp_y.addLegend()
+            self.plot_cp_y.showGrid(x=True, y=True)
+            self.curve_cp_y = self.plot_cp_y.plot(pen='b', name='CP Y')
 
-        self.plot_com_y = self.win.addPlot(
-            title="CoM Y Over Time", row=3, col=1)
-        self.plot_com_y.setLabels(left='Y Value', bottom='Time (s)')
-        self.plot_com_y.addLegend()
-        self.plot_com_y.showGrid(x=True, y=True)
-        self.curve_com_y = self.plot_com_y.plot(pen='m', name='CoM Y')
+            self.plot_com_y = self.win.addPlot(
+                title="CoM Y Over Time", row=3, col=1)
+            self.plot_com_y.setLabels(left='Y Value', bottom='Time (s)')
+            self.plot_com_y.addLegend()
+            self.plot_com_y.showGrid(x=True, y=True)
+            self.curve_com_y = self.plot_com_y.plot(pen='m', name='CoM Y')
 
-        # Set up timer for update loop
-        self.timer = QtCore.QTimer()
-        self.timer.timeout.connect(self.update_plot)
-        self.timer.start(50)  # 20 Hz
+            # Set up timer for update loop
+            self.timer = QtCore.QTimer()
+            self.timer.timeout.connect(self.update_plot)
+            self.timer.start(50)  # 20 Hz
 
     def get_ankle_wrenches(self):
         # read ankle wrenches
@@ -450,7 +455,7 @@ class Environment(Node):
 
     def update_plot(self):
         # Set data to curves
-        if len(self.time) > 0:
+        if len(self.time) > 0 and DO_PLOT:
             self.curve_zmp_x.setData(self.time, self.zmp_x)
             self.curve_cmp_x.setData(self.time, self.cmp_x)
             self.curve_cp_x.setData(self.time, self.cp_x)
@@ -462,7 +467,7 @@ class Environment(Node):
             self.curve_com_y.setData(self.time, self.com_y)
 
     def update(self):
-        # elaped time
+        # elapsed time
         t = self.simulator.simTime()
 
         # update the simulator and the robot
@@ -513,14 +518,29 @@ def main(args=None):
     rclpy.init(args=args)
     env = Environment()
 
-    ros_thread = threading.Thread(target=ros_spin_thread, args=(env,))
-    ros_thread.start()
+    # threading for faster simulation with plots
+    if THREADING and DO_PLOT:
+        ros_thread = threading.Thread(target=ros_spin_thread, args=(env,))
+        ros_thread.start()
 
-    env.app.exec_()
+        env.app.exec_()
 
-    env.destroy_node()
-    rclpy.shutdown()
-    ros_thread.join()
+        env.destroy_node()
+        rclpy.shutdown()
+        ros_thread.join()
+    else:
+        try:
+            while rclpy.ok():
+                env.update()
+
+                if DO_PLOT:
+                    env.app.processEvents()
+
+        except (KeyboardInterrupt, ExternalShutdownException):
+            pass
+        finally:
+            env.destroy_node()
+            rclpy.shutdown()
 
 
 if __name__ == '__main__':
