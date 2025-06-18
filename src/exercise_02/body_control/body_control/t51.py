@@ -249,8 +249,8 @@ class Environment(Node):
 
         # init external forces
         force = 55.0
-        f_right = force * np.array([0.0, -1.0, 0.0])
-        f_left = force * np.array([0.0, 1.0, 0.0])
+        f_right = force * np.array([0.0, 1.0, 0.0])
+        f_left = force * np.array([0.0, -1.0, 0.0])
         f_back = force * np.array([1.0, 0.0, 0.0])
         self.f_ext_right = ExtPushForce(
             self.robot, self.simulator, f_right, 4.0, 0.25)
@@ -545,7 +545,7 @@ class Environment(Node):
         # balance strategy
         # self.balance_crtl.ankle_strategy(
         #    self.robot.baseCoMPosition(), self.get_zmp())
-        self.balance_crtl.hip_strategy(self.get_cmp())
+        # self.balance_crtl.hip_strategy(self.get_cmp())
 
         # update TSID controller
         tau_sol, _ = self.tsid_wrapper.update(
