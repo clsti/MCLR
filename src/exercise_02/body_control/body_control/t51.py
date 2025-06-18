@@ -35,7 +35,7 @@ from geometry_msgs.msg import TransformStamped
 
 THREADING = True
 DO_PLOT = True
-USE_MAXLEN = True
+USE_MAXLEN = False
 MAXLEN = 500
 
 ################################################################################
@@ -181,11 +181,14 @@ class BalanceController():
         self.K_x_ankle = conf.kx_ankle
         self.K_p_ankle = conf.kp_ankle
 
+        self.delta_x_com = np.array([0.0, 0.0, 0.0])
+        self.max_offset = np.array([0.05, 0.05, 0.0])
+
         # hip strategy parameters
         self.r_ref = conf.r_ref
         self.K_gamma_hip = conf.kgamma_hip
 
-    def ankle_strategy(self, x_d, p, x_ref_dot=None):
+    def ankle_strategy(self, dt, x_d, p, x_ref_dot=None):
         '''
         Ankle balance strategy for small disturbances
         '''
@@ -200,8 +203,16 @@ class BalanceController():
         # x_d_dot: new desired velocity for CoM
         x_d_dot = x_ref_dot - self.K_x_ankle @ d_x + self.K_p_ankle @ d_p
 
-        # TODO: How to use x_d_dot? - INTEGRATE
-        self.tsid_wrapper.setComRefState(self.p_ref, x_d_dot)
+        # integrate velocity
+        self.delta_x_com += x_d_dot * dt
+
+        # clip delta to prevent drift
+        self.delta_x_com = np.clip(
+            self.delta_x_com, -self.max_offset, self.max_offset)
+
+        x_com = self.p_ref + self.delta_x_com
+
+        self.tsid_wrapper.setComRefState(x_com, x_d_dot)
 
     def hip_strategy(self, r):
         '''
@@ -248,16 +259,16 @@ class Environment(Node):
         self.balance_crtl = BalanceController(self.robot, self.tsid_wrapper)
 
         # init external forces
-        force = 55.0
+        force = 70.0
         f_right = force * np.array([0.0, 1.0, 0.0])
         f_left = force * np.array([0.0, -1.0, 0.0])
         f_back = force * np.array([1.0, 0.0, 0.0])
         self.f_ext_right = ExtPushForce(
-            self.robot, self.simulator, f_right, 4.0, 0.25)
+            self.robot, self.simulator, f_right, 4.0, 0.5)
         self.f_ext_left = ExtPushForce(
-            self.robot, self.simulator, f_left, 4.2, 0.25)
+            self.robot, self.simulator, f_left, 6.0, 0.5)
         self.f_ext_back = ExtPushForce(
-            self.robot, self.simulator, f_back, 4.1, 0.3)
+            self.robot, self.simulator, f_back, 8.0, 0.5)
 
         # add force-torque sensors at ankles
         pb.enableJointForceTorqueSensor(
@@ -386,74 +397,90 @@ class Environment(Node):
             [-wren_l[0], -wren_l[1], -wren_l[2], -wren_l[3], -wren_l[4], -wren_l[5]])
         wl_lankle = pin.Force(wnp_l)
 
+        return wr_rankle, wl_lankle
+
+    def get_ankle_transf(self):
+
         # get positions of ankles and soles
         data = self.robot._model.createData()
         pin.framesForwardKinematics(self.robot._model, data, self.robot.q())
 
-        H_w_lsole = data.oMf[self.robot._model.getFrameId("left_sole_link")]
         H_w_rsole = data.oMf[self.robot._model.getFrameId("right_sole_link")]
-        H_w_lankle = data.oMf[self.robot._model.getFrameId("leg_left_6_joint")]
+        H_w_lsole = data.oMf[self.robot._model.getFrameId("left_sole_link")]
         H_w_rankle = data.oMf[self.robot._model.getFrameId(
             "leg_right_6_joint")]
+        H_w_lankle = data.oMf[self.robot._model.getFrameId("leg_left_6_joint")]
 
-        # transform wrenches to world frame
-        wr_world = H_w_rankle.act(wr_rankle)
-        wl_world = H_w_lankle.act(wl_lankle)
-
-        # transform wrenches to sole frame
-        wr_sole = H_w_rsole.actInv(wr_world)
-        wl_sole = H_w_lsole.actInv(wl_world)
-
-        return wr_sole, wl_sole
+        return H_w_rankle, H_w_lankle, H_w_rsole, H_w_lsole
 
     def estimate_ZMP(self):
         # estimate the Zero Moment Point
         d = 0.1
 
-        # get wrenches
-        wr_sole, wl_sole = self.get_ankle_wrenches()
+        # get wrenches (6 joint coordinate frame)
+        wr_ankle, wl_ankle = self.get_ankle_wrenches()
         # right ankle (R)
-        tau_xR, tau_yR, tau_zR = wr_sole.angular
-        f_xR, f_yR, f_zR = wr_sole.linear
+        tau_xR, tau_yR, tau_zR = wr_ankle.angular
+        f_xR, f_yR, f_zR = wr_ankle.linear
         # left ankle (L)
-        tau_xL, tau_yL, tau_zL = wl_sole.angular
-        f_xL, f_yL, f_zL = wl_sole.linear
+        tau_xL, tau_yL, tau_zL = wl_ankle.angular
+        f_xL, f_yL, f_zL = wl_ankle.linear
 
         # avoid division by zero
         f_zR = f_zR if abs(f_zR) > 1e-6 else 1e-6
         f_zL = f_zL if abs(f_zL) > 1e-6 else 1e-6
 
-        # left foot
-        p_xL = (-tau_yL - f_xL * d) / f_zL
-        p_yL = (tau_xL - f_yL * d) / f_zL
-        p_zL = 0
-        p_L = np.array([p_xL, p_yL, p_zL])
-
-        # right foot
+        # right foot (foot/sole coordinate frame)
         p_xR = (-tau_yR - f_xR * d) / f_zR
         p_yR = (tau_xR - f_yR * d) / f_zR
         p_zR = 0
         p_R = np.array([p_xR, p_yR, p_zR])
 
+        # left foot (foot/sole coordinate frame)
+        p_xL = (-tau_yL - f_xL * d) / f_zL
+        p_yL = (tau_xL - f_yL * d) / f_zL
+        p_zL = 0
+        p_L = np.array([p_xL, p_yL, p_zL])
+
+        # Transform points (p_L & p_R) to world frame
+        H_w_rankle, H_w_lankle, H_w_rsole, H_w_lsole = self.get_ankle_transf()
+        w_p_R = H_w_rsole.act(p_R)
+        w_p_L = H_w_lsole.act(p_L)
+
+        # Transform wrenches to ZMP
+        w_H_zmpR = pin.SE3(np.eye(3), w_p_R)
+        w_H_zmpL = pin.SE3(np.eye(3), w_p_L)
+        wr_foot = w_H_zmpR.inverse().act(H_w_rankle.act(wr_ankle))
+        wl_foot = w_H_zmpL.inverse().act(H_w_lankle.act(wl_ankle))
+
+        # extract ground reaction forces of right and left feet in ZMP
+        f_x_fR, f_y_fR, f_z_fR = wr_foot.linear
+        f_x_fL, f_y_fL, f_z_fL = wl_foot.linear
+
         # distinguish foot support
-        total_fz = f_zR + f_zL
-        double_support = total_fz > 1e-3 and f_zR > 1e-3 and f_zL > 1e-3
+        total_fz = f_z_fR + f_z_fL
+        double_support = total_fz > 1e-3 and f_z_fR > 1e-3 and f_z_fL > 1e-3
 
         if double_support:
             # double support
-            p_x = (p_xR * f_zR + p_xL * f_zL) / (f_zR + f_zL)
-            p_y = (p_yR * f_zR + p_yL * f_zL) / (f_zR + f_zL)
+            p_x = (w_p_R[0] * f_z_fR + w_p_L[0] * f_z_fL) / (f_z_fR + f_z_fL)
+            p_y = (w_p_R[1] * f_z_fR + w_p_L[1] * f_z_fL) / (f_z_fR + f_z_fL)
             p_z = 0
             self.zmp_curr_est = np.array([p_x, p_y, p_z])
-            self.f_total = wr_sole.linear + wl_sole.linear
+
+            # Transform ground reaction force to zmp
+            w_H_zmp = pin.SE3(np.eye(3), self.zmp_curr_est)
+            wr_zmp = w_H_zmp.inverse().act(H_w_rankle.act(wr_ankle))
+            wl_zmp = w_H_zmp.inverse().act(H_w_lankle.act(wl_ankle))
+            self.f_total = wr_zmp.linear + wl_zmp.linear
         else:
             # single support
             if f_zR > f_zL:
-                self.zmp_curr_est = p_R
-                self.f_total = wr_sole.linear
+                self.zmp_curr_est = w_p_R
+                self.f_total = wr_foot.linear
             else:
-                self.zmp_curr_est = p_L
-                self.f_total = wl_sole.linear
+                self.zmp_curr_est = w_p_L
+                self.f_total = wl_foot.linear
 
     def estimate_CMP(self):
         # estimate the Centroidal Moment Pivot
@@ -528,6 +555,7 @@ class Environment(Node):
     def update(self):
         # elapsed time
         t = self.simulator.simTime()
+        dt = self.simulator.stepTime()
 
         # update the simulator and the robot
         self.simulator.step()
@@ -544,8 +572,8 @@ class Environment(Node):
 
         # balance strategy
         # self.balance_crtl.ankle_strategy(
-        #    self.robot.baseCoMPosition(), self.get_zmp())
-        # self.balance_crtl.hip_strategy(self.get_cmp())
+        #     dt, self.robot.baseCoMPosition(), self.get_zmp())
+        self.balance_crtl.hip_strategy(self.get_cmp())
 
         # update TSID controller
         tau_sol, _ = self.tsid_wrapper.update(
