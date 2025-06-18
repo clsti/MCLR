@@ -200,7 +200,7 @@ class BalanceController():
         # x_d_dot: new desired velocity for CoM
         x_d_dot = x_ref_dot - self.K_x_ankle @ d_x + self.K_p_ankle @ d_p
 
-        # TODO: How to use x_d_dot?
+        # TODO: How to use x_d_dot? - INTEGRATE
         self.tsid_wrapper.setComRefState(self.p_ref, x_d_dot)
 
     def hip_strategy(self, r):
@@ -425,13 +425,13 @@ class Environment(Node):
 
         # left foot
         p_xL = (-tau_yL - f_xL * d) / f_zL
-        p_yL = (-tau_xL - f_yL * d) / f_zL
+        p_yL = (tau_xL - f_yL * d) / f_zL
         p_zL = 0
         p_L = np.array([p_xL, p_yL, p_zL])
 
         # right foot
         p_xR = (-tau_yR - f_xR * d) / f_zR
-        p_yR = (-tau_xR - f_yR * d) / f_zR
+        p_yR = (tau_xR - f_yR * d) / f_zR
         p_zR = 0
         p_R = np.array([p_xR, p_yR, p_zR])
 
@@ -457,9 +457,9 @@ class Environment(Node):
 
     def estimate_CMP(self):
         # estimate the Centroidal Moment Pivot
-        p_zmp = self.get_zmp()
+        p_com = self.robot.baseCoMPosition()
         f = self.get_f_total()
-        X_x, X_y, X_z = p_zmp
+        X_x, X_y, X_z = p_com
         f_x, f_y, f_z = f
 
         r_x = X_x - f_x/f_z * X_z
