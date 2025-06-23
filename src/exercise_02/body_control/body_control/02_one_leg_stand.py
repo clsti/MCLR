@@ -125,7 +125,7 @@ class Environment(Node):
 
         self.t_publish = 0.0
 
-        # balance on one foot
+        # shift center of mass to balance on one foot
         com_curr = self.tsid_wrapper.comState().value()
         foot_placement_RF = self.tsid_wrapper.get_placement_RF().translation
         com_new = np.array(
@@ -136,7 +136,7 @@ class Environment(Node):
         self.foot_lf_is_lifted = False
 
     def update(self):
-        # elaped time
+        # elapsed time
         t = self.simulator.simTime()
 
         # update the simulator and the robot
@@ -155,7 +155,7 @@ class Environment(Node):
             # remove left foot contact after 2 seconds
             self.tsid_wrapper.remove_contact_LF()
 
-            # change left foor reference 0.3m above ground
+            # change left foot reference 0.3m above ground
             foot_placement_LF = self.tsid_wrapper.get_placement_LF()
             foot_placement_LF.translation[2] += 0.3
             self.tsid_wrapper.set_LF_pose_ref(foot_placement_LF)

@@ -136,20 +136,20 @@ class Environment(Node):
         self.duration_shift_com = 2.0
         self.foot_lf_is_lifted = False
 
-        # squatting
+        # squatting parameters
         self.t_start_squat = 4.0  # s
         self.is_squatting = False
         self.wave_amp = 0.05  # m
         self.wave_freq = 0.5  # Hz
         self.omega_squat = 2.0 * np.pi * self.wave_freq
 
-        # Arm motions
+        # arm motion parameters
         self.t_start_arm_motion = 8.0  # s
         self.arm_motion = False
         self.center_of_circle = np.array([0.4, -0.2, 1.1])
         self.arm_radius = 0.2  # m
         self.arm_freq = 0.1  # Hz
-        self.omega_arm = 2.0 * np.pi * self.arm_freq
+        self.arm_omega = 2.0 * np.pi * self.arm_freq
 
         # visualize arm trajectory
         traj, _, _ = self.arm_circle(np.linspace(0, 1./self.arm_freq, num=100))
@@ -183,15 +183,15 @@ class Environment(Node):
 
     def arm_circle(self, t):
         dx = 0.0 * t
-        dy = self.arm_radius * np.cos(self.omega_arm * t)
-        dz = self.arm_radius * np.sin(self.omega_arm * t)
+        dy = self.arm_radius * np.cos(self.arm_omega * t)
+        dz = self.arm_radius * np.sin(self.arm_omega * t)
         pos = self.center_of_circle[:, np.newaxis] + np.vstack([dx, dy, dz])
-        vel = self.arm_radius * self.omega_arm * np.vstack([0.0 * t,
-                                                           -np.sin(self.omega_arm * t),
-                                                           np.cos(self.omega_arm * t)])
-        acc = self.arm_radius * self.omega_arm**2 * np.vstack([0.0 * t,
-                                                              -np.cos(self.omega_arm * t),
-                                                              -np.sin(self.omega_arm * t)])
+        vel = self.arm_radius * self.arm_omega * np.vstack([0.0 * t,
+                                                           -np.sin(self.arm_omega * t),
+                                                           np.cos(self.arm_omega * t)])
+        acc = self.arm_radius * self.arm_omega**2 * np.vstack([0.0 * t,
+                                                              -np.cos(self.arm_omega * t),
+                                                              -np.sin(self.arm_omega * t)])
         return pos, vel, acc
 
     def update(self):
@@ -223,7 +223,7 @@ class Environment(Node):
 
         if t > self.t_start_squat:
             if not self.is_squatting:
-                # get initial position
+                # get initial com position
                 self.com_squat_init = self.tsid_wrapper.comState()
                 self.tsid_wrapper.setComRefState(
                     self.com_squat_init.value(),
@@ -233,11 +233,12 @@ class Environment(Node):
             # start squatting
             t_squat = t - self.t_start_squat
             pos_z, vel_z, acc_z = self.sine_wave_squat(t_squat)
-            pos = self.com_squat_init.value() + np.array([0, 0, pos_z])
-            vel = self.com_squat_init.derivative() + np.array([0, 0, vel_z])
-            acc = self.com_squat_init.second_derivative() + \
+            pos_squat = self.com_squat_init.value() + np.array([0, 0, pos_z])
+            vel_squat = self.com_squat_init.derivative() + \
+                np.array([0, 0, vel_z])
+            acc_squat = self.com_squat_init.second_derivative() + \
                 np.array([0, 0, acc_z])
-            self.tsid_wrapper.setComRefState(pos, vel, acc)
+            self.tsid_wrapper.setComRefState(pos_squat, vel_squat, acc_squat)
 
             self.is_squatting = True
 
@@ -255,9 +256,9 @@ class Environment(Node):
 
             # start arm motion
             t_arm = t - self.t_start_arm_motion
-            pos, vel, acc = self.arm_circle(t_arm)
+            pos_arm, vel_arm, acc_arm = self.arm_circle(t_arm)
             self.tsid_wrapper.set_RH_pos_ref(
-                pos.reshape(-1), vel.reshape(-1), acc.reshape(-1))
+                pos_arm.reshape(-1), vel_arm.reshape(-1), acc_arm.reshape(-1))
 
             # publish to ros
         if t - self.t_publish > 1./30.:
