@@ -48,7 +48,7 @@ class Talos(Robot):
         # call base class constructor
 
         # Initial condition for the simulator an model
-        z_init = 1.15
+        z_init = 1.1
 
         super().__init__(
             simulator,
@@ -210,7 +210,7 @@ class BalanceController():
         self.delta_x_com = np.clip(
             self.delta_x_com, -self.max_offset, self.max_offset)
 
-        x_com = self.p_ref + self.delta_x_com
+        x_com = self.x_ref + self.delta_x_com
 
         self.tsid_wrapper.setComRefState(x_com, x_d_dot)
 
@@ -242,7 +242,7 @@ class Environment(Node):
         # init Simulator
         self.simulator = PybulletWrapper(sim_rate=conf.f_cntr)
 
-        q_init = np.hstack([np.array([0, 0, 1.15, 0, 0, 0, 1]),
+        q_init = np.hstack([np.array([0, 0, 1.1, 0, 0, 0, 1]),
                            np.zeros_like(conf.q_actuated_home)])
 
         # init ROBOT
@@ -500,6 +500,7 @@ class Environment(Node):
         x_CoM = self.robot.baseCoMPosition()
         x_p = np.array([x_CoM[0], x_CoM[1], 0.0])
         x_p_dot = self.robot.baseCoMVelocity()
+        x_p_dot = np.array([x_p_dot[0], x_p_dot[1], 0.0])
         omega = np.sqrt(g/x_CoM[2])
 
         self.cp_curr_est = x_p + x_p_dot/omega

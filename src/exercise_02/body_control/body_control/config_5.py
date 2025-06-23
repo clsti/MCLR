@@ -27,7 +27,7 @@ q_actuated_home[6:12] = np.array([-0.0004612402198835852, -0.0031162522884748967
                                  0.4426315354712109, 0.9014369887125069, -0.4588832011407824, 0.003546732694320376])
 q_actuated_home[14:21] = np.array([0, 0, 0.15, -1, 0, 0, 0])
 q_actuated_home[21:28] = np.array([0, 0, -0.15, -1, 0, 0, 0])
-q_home = np.hstack([np.array([0, 0, 1.15, 0, 0, 0, 1]), q_actuated_home])
+q_home = np.hstack([np.array([0, 0, 1.1, 0, 0, 0, 1]), q_actuated_home])
 
 '''
 0, 1, 2, 3, 4, 5,		# left leg
@@ -115,11 +115,11 @@ v_max_scaling = 0.8             # scaling velocity bounds
 ################################################################################
 
 # Ankle strategy
-x_ref = np.array([0.0, 0.0, 0.0])
-p_ref = np.array([0.0, 0.0, 0.95])
+x_ref = np.array([0.0, 0.0, 0.9])
+p_ref = np.array([0.0, 0.0, 0.0])
 kx_ankle = np.diag([4.0, 4.0, 0.0])
 kp_ankle = np.diag([2.0, 2.0, 0.0])
 
 # Hip strategy
 r_ref = np.array([0.0, 0.0, 0.0])
-kgamma_hip = 20.0 * np.diag([1.0, 1.0, 0.0])
+kgamma_hip = 1.0 * np.diag([1.0, 1.0, 0.0])
