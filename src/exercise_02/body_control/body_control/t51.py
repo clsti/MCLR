@@ -140,24 +140,31 @@ class ExtPushForce():
         if t >= self.t_start and t <= self.t_end:
             # apply force
             self.robot.applyForce(self.force)
-            if self.verbose:
-                # update debug arrow for high CoM deviations
-                p2 = np.array(self.robot.baseCoMPosition())
-                if self.line_id is not None:
-                    if (np.abs(p2 - self.p2_old) > 0.01).any():
-                        p1 = p2 - self.direction
-                        self.simulator.removeDebugItem(self.line_id)
-                        self.line_id = self.simulator.addGlobalDebugLine(
-                            p1, p2, -1, color=self.color)
-                        self.p2_old = p2
-                else:
+
+            self.visualize_force()
+
+        self.remove_visualization(t)
+
+    def visualize_force(self):
+        if self.verbose:
+            # update debug arrow for high CoM deviations
+            p2 = np.array(self.robot.baseCoMPosition())
+            if self.line_id is not None:
+                if (np.abs(p2 - self.p2_old) > 0.01).any():
                     p1 = p2 - self.direction
+                    self.simulator.removeDebugItem(self.line_id)
                     self.line_id = self.simulator.addGlobalDebugLine(
                         p1, p2, -1, color=self.color)
                     self.p2_old = p2
+            else:
+                p1 = p2 - self.direction
+                self.line_id = self.simulator.addGlobalDebugLine(
+                    p1, p2, -1, color=self.color)
+                self.p2_old = p2
 
+    def remove_visualization(self, t):
         if t > self.t_end and not self.line_removed:
-            # remove debug error after period
+            # remove debug line after period
             self.simulator.removeDebugItem(self.line_id)
             self.line_removed = True
 
@@ -165,6 +172,7 @@ class ExtPushForce():
 ################################################################################
 # External pushing force
 ################################################################################
+
 
 class BalanceController():
     def __init__(self, robot, tsid_wrapper, verbose=True):
@@ -236,12 +244,13 @@ class Environment(Node):
     def __init__(self):
         super().__init__('tutorial_4_standing_node')
 
-        # init TSIDWrapper
+        # init TSIDWrapper (including CoM & whole-body angular momentum tasks)
         self.tsid_wrapper = TSIDWrapper(conf)
 
         # init Simulator
         self.simulator = PybulletWrapper(sim_rate=conf.f_cntr)
 
+        # use q_init for robot initialization, as conf.q_home results in error
         q_init = np.hstack([np.array([0, 0, 1.1, 0, 0, 0, 1]),
                            np.zeros_like(conf.q_actuated_home)])
 

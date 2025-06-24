@@ -110,6 +110,7 @@ class Environment(Node):
         # init Simulator
         self.simulator = PybulletWrapper(sim_rate=conf.f_cntr)
 
+        # use q_init for robot initialization, as conf.q_home results in error
         q_init = np.hstack([np.array([0, 0, 1.15, 0, 0, 0, 1]),
                            np.zeros_like(conf.q_actuated_home)])
 
