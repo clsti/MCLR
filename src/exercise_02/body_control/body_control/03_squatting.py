@@ -274,22 +274,22 @@ class Environment(Node):
                 self.t_plot = t
                 self.plot()
 
-    def update_figure(self, axs, data_tsid, data_ref, data_sim=None, title=None):
+    def update_figure(self, axs, data_tsid, data_ref, data_sim, title=None, crop=None):
         labels = ['X', 'Y', 'Z']
         t = np.array(self.plot_time)
         ref = np.array(data_ref)
         tsid = np.array(data_tsid)
-        sim = np.array(data_sim) if data_sim else None
+        sim = np.array(data_sim)
 
         for i in range(3):
             axs[i].cla()
             axs[i].plot(t, tsid[:, i], 'r--', label='tsid')
             axs[i].plot(t, ref[:, i], 'b--', label='ref')
-            if sim is not None:
-                axs[i].plot(t, sim[:, i],
-                            'g--', label='sim')
+            axs[i].plot(t, sim[:, i], 'g--', label='sim')
             axs[i].set_ylabel(f'{labels[i]}')
             axs[i].set_title(f'{title} - {labels[i]}')
+            if crop is not None:
+                axs[i].set_ylim(crop[0], crop[1])
             axs[i].legend()
             axs[i].grid()
 
@@ -299,13 +299,19 @@ class Environment(Node):
         com_tsid = self.tsid_wrapper.comState()
         self.plot_tsid_pos.append(com_tsid.value())
         self.plot_tsid_vel.append(com_tsid.derivative())
-        self.plot_tsid_acc.append(com_tsid.second_derivative())
+        self.plot_tsid_acc.append(
+            self.tsid_wrapper.comTask.getDesiredAcceleration)
         gt_pos = self.robot.baseWorldPosition()
         gt_vel = self.robot.baseWorldLinearVeloctiy()
-        # gt_acc = self.robot.baseWorldAcceleration()
+        # Central difference method to get acceleration
+        if len(self.plot_gt_vel) >= 3:
+            gt_acc = (self.plot_gt_vel[-1] - self.plot_gt_vel[-3]
+                      ) / (self.plot_time[-1] - self.plot_time[-3])
+        else:
+            gt_acc = np.zeros_like(gt_vel)
         self.plot_gt_pos.append(gt_pos)
         self.plot_gt_vel.append(gt_vel)
-        # self.plot_gt_acc.append(gt_acc)
+        self.plot_gt_acc.append(gt_acc)
         com_ref = self.tsid_wrapper.comReference()
         self.plot_ref_pos.append(com_ref.value())
         self.plot_ref_vel.append(com_ref.derivative())
@@ -317,7 +323,8 @@ class Environment(Node):
         self.update_figure(self.axs_vel, self.plot_tsid_vel,
                            self.plot_ref_vel, self.plot_gt_vel, "Velocity")
         self.update_figure(self.axs_acc, self.plot_tsid_acc,
-                           self.plot_ref_acc, None, "Acceleration")
+                           self.plot_ref_acc, self.plot_gt_acc, "Acceleration",
+                           crop=(-3, 3))
 
         self.fig_pos.tight_layout()
         self.fig_vel.tight_layout()
