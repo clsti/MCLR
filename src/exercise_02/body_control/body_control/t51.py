@@ -428,31 +428,40 @@ class Environment(Node):
 
         # get wrenches (6 joint coordinate frame)
         wr_ankle, wl_ankle = self.get_ankle_wrenches()
-        # right ankle (R)
-        tau_xR, tau_yR, tau_zR = wr_ankle.angular
-        f_xR, f_yR, f_zR = wr_ankle.linear
-        # left ankle (L)
-        tau_xL, tau_yL, tau_zL = wl_ankle.angular
-        f_xL, f_yL, f_zL = wl_ankle.linear
 
-        # avoid division by zero
-        f_zR = f_zR if abs(f_zR) > 1e-6 else 1e-6
-        f_zL = f_zL if abs(f_zL) > 1e-6 else 1e-6
+        # get positions of ankles and soles
+        H_w_rankle, H_w_lankle, H_w_rsole, H_w_lsole = self.get_ankle_transf()
 
-        # right foot (foot/sole coordinate frame)
-        p_xR = (-tau_yR - f_xR * d) / f_zR
-        p_yR = (tau_xR - f_yR * d) / f_zR
-        p_zR = 0
-        p_R = np.array([p_xR, p_yR, p_zR])
+        # function for calculating the zmp of the respective foot
+        def calc_foot_zmp(wrench):
+            tau_x, tau_y, tau_z = wrench.angular
+            f_x, f_y, f_z = wrench.linear
 
-        # left foot (foot/sole coordinate frame)
-        p_xL = (-tau_yL - f_xL * d) / f_zL
-        p_yL = (tau_xL - f_yL * d) / f_zL
-        p_zL = 0
-        p_L = np.array([p_xL, p_yL, p_zL])
+            # avoid division by zero
+            f_z = f_z if abs(f_z) > 1e-6 else 1e-6
+
+            p_x = (-tau_y - f_x * d) / f_z
+            p_y = (tau_x - f_y * d) / f_z
+            p_z = 0
+            return np.array([p_x, p_y, p_z])
+
+        # function for calculating the double support zmp
+        def calc_zmp(pR, pL, fR_z, fL_z):
+            pR_x, pR_y, pR_z = pR
+            pL_x, pL_y, pL_z = pL
+
+            # calculate zmp
+            p_x_zmp = (pR_x * fR_z + pL_x * fL_z) / (fR_z + fL_z)
+            p_y_zmp = (pR_y * fR_z + pL_y * fL_z) / (fR_z + fL_z)
+            return np.array([p_x_zmp, p_y_zmp, 0.0])
+
+        # right & left foot zmp (foot/sole coordinate frame)
+        p_R = calc_foot_zmp(wr_ankle)
+        p_L = calc_foot_zmp(wl_ankle)
+
+        # ------------------ Version 1 ------------------ #
 
         # Transform points (p_L & p_R) to world frame
-        H_w_rankle, H_w_lankle, H_w_rsole, H_w_lsole = self.get_ankle_transf()
         w_p_R = H_w_rsole.act(p_R)
         w_p_L = H_w_lsole.act(p_L)
 
@@ -472,24 +481,45 @@ class Environment(Node):
 
         if double_support:
             # double support
-            p_x = (w_p_R[0] * f_z_fR + w_p_L[0] * f_z_fL) / (f_z_fR + f_z_fL)
-            p_y = (w_p_R[1] * f_z_fR + w_p_L[1] * f_z_fL) / (f_z_fR + f_z_fL)
-            p_z = 0
-            self.zmp_curr_est = np.array([p_x, p_y, p_z])
+            self.zmp_curr_est = calc_zmp(w_p_R, w_p_L, f_z_fR, f_z_fL)
 
             # Transform ground reaction force to zmp
             w_H_zmp = pin.SE3(np.eye(3), self.zmp_curr_est)
             wr_zmp = w_H_zmp.inverse().act(H_w_rankle.act(wr_ankle))
             wl_zmp = w_H_zmp.inverse().act(H_w_lankle.act(wl_ankle))
             self.f_total = wr_zmp.linear + wl_zmp.linear
+
         else:
             # single support
-            if f_zR > f_zL:
+            if f_z_fR > f_z_fL:
                 self.zmp_curr_est = w_p_R
                 self.f_total = wr_foot.linear
             else:
                 self.zmp_curr_est = w_p_L
                 self.f_total = wl_foot.linear
+
+        # ------------------ Version 2 ------------------ #
+
+        # right & left foot zmp
+        CORR_p_R = np.array([p_R[0], p_R[1], -d])
+        CORR_p_L = np.array([p_L[0], p_L[1], -d])
+
+        # zmp
+        CORR_p_zmp = calc_zmp(CORR_p_R, CORR_p_L,
+                              wr_ankle.linear[2], wl_ankle.linear[2])
+
+        # Ground reaction force
+        CORR_w_H_p = pin.SE3(np.eye(3), CORR_p_zmp)
+
+        CORR_p_H_rankle = CORR_w_H_p.inverse() * H_w_rankle
+        CORR_p_H_lankle = CORR_w_H_p.inverse() * H_w_lankle
+        CORR_wr_p = CORR_p_H_rankle.act(wr_ankle)
+        CORR_wl_p = CORR_p_H_lankle.act(wl_ankle)
+        CORR_total_w = CORR_wr_p + CORR_wl_p
+
+        # copy values
+        self.f_total = CORR_total_w.linear
+        self.zmp_curr_est = CORR_p_zmp
 
     def estimate_CMP(self):
         # estimate the Centroidal Moment Pivot
@@ -583,7 +613,7 @@ class Environment(Node):
         # balance strategy
         # self.balance_crtl.ankle_strategy(
         #     dt, self.robot.baseCoMPosition(), self.get_zmp())
-        self.balance_crtl.hip_strategy(self.get_cmp())
+        # self.balance_crtl.hip_strategy(self.get_cmp())
 
         # update TSID controller
         tau_sol, _ = self.tsid_wrapper.update(
