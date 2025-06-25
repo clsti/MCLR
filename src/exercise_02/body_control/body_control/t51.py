@@ -268,7 +268,7 @@ class Environment(Node):
         self.balance_crtl = BalanceController(self.robot, self.tsid_wrapper)
 
         # init external forces
-        force = 30.0
+        force = 60.0
         f_right = force * np.array([0.0, 1.0, 0.0])
         f_left = force * np.array([0.0, -1.0, 0.0])
         f_back = force * np.array([1.0, 0.0, 0.0])
