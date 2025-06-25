@@ -15,7 +15,7 @@ source install/setup.bash
 ```
 * Execute all commands in workspace
 
-## Launch rviz (for all exercises)
+## Launch rviz (Same for all exercises)
 ```sh
 ros2 launch ros_visuals talos_rviz_world.launch.py
 ```
@@ -35,4 +35,25 @@ ros2 run body_control one_leg_stand
 ### Exercise 3 & 4: Getting the robot to do squats, Adding arm motions & Do some plotting
 ```sh
 ros2 run body_control squatting
+```
+
+
+## Tutorial 5
+##### Notes: 
+- To stop the program, please close the plot/diagram window.
+- In case of import errors:
+  - Please install PyQt5 (version 5.15.10), or
+  - Set the variable `DO_PLOT = False` to deactivate plotting (& comment imports).
+- Threading is used to speed up the simulation. You can disable it by setting `THREADING = False`.
+- To reduce plotting computation, you can limit the maximum number of time steps by enabling `USE_MAXLEN = True` and setting `MAXLEN = 500`.
+
+
+### Exercise 1 & 2 & 3: Prepare your simulation, Ground reference points & Balance control
+```sh
+ros2 run body_control t51
+```
+
+### Exercise 4: Position-controlled hardware interface
+```sh
+ros2 run body_control t52
 ```
