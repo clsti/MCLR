@@ -465,7 +465,7 @@ class Environment(Node):
 
         # calculate zmp for double support
         self.zmp_curr_est = calc_zmp(
-            p_R, p_L, wr_ankle.linear[2], wl_ankle.linear[2])
+            w_p_R, w_p_L, wr_ankle.linear[2], wl_ankle.linear[2])
 
         # Transform ground reaction force to zmp
         w_H_zmp = pin.SE3(np.eye(3), self.zmp_curr_est)

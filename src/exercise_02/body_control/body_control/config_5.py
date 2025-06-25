@@ -118,7 +118,7 @@ v_max_scaling = 0.8             # scaling velocity bounds
 x_ref = np.array([0.0, 0.0, 0.85])
 p_ref = np.array([0.0, 0.0, 0.0])
 kx_ankle = 5.0 * np.diag([1.0, 1.0, 0.0])
-kp_ankle = 2.0 * np.diag([1.0, 1.0, 0.0])
+kp_ankle = 1.0 * np.diag([1.0, 1.0, 0.0])
 
 # Hip strategy
 r_ref = np.array([0.0, 0.0, 0.0])
