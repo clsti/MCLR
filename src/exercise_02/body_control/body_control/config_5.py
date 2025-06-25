@@ -15,7 +15,7 @@ urdf = os.path.join("exercise_02", talos_description,
                     "robots/talos_reduced_no_hands.urdf")
 path = os.path.join("exercise_02", talos_description, "meshes/../..")
 
-dt = 0.001                                      # controller time step
+dt = 0.002                                      # controller time step
 f_cntr = 1.0/dt                                 # controller freq
 na = 30                                         # number of actuated
 
@@ -25,8 +25,8 @@ q_actuated_home[:6] = np.array([0.0004217227847487237, -0.00457389353360238, -
                                0.44288825380502317, 0.9014217614029372, -0.4586176441428318, 0.00413219379047014])
 q_actuated_home[6:12] = np.array([-0.0004612402198835852, -0.0031162522884748967, -
                                  0.4426315354712109, 0.9014369887125069, -0.4588832011407824, 0.003546732694320376])
-q_actuated_home[14:21] = np.array([0, 0, 0.15, -1, 0, 0, 0])
-q_actuated_home[21:28] = np.array([0, 0, -0.15, -1, 0, 0, 0])
+q_actuated_home[14:21] = np.array([0, -0.24, 0, -1, 0, 0, 0])
+q_actuated_home[21:28] = np.array([0, -0.24, 0, -1, 0, 0, 0])
 q_home = np.hstack([np.array([0, 0, 1.1, 0, 0, 0, 1]), q_actuated_home])
 
 '''
@@ -115,10 +115,10 @@ v_max_scaling = 0.8             # scaling velocity bounds
 ################################################################################
 
 # Ankle strategy
-x_ref = np.array([0.0, 0.0, 0.9])
+x_ref = np.array([0.0, 0.0, 0.85])
 p_ref = np.array([0.0, 0.0, 0.0])
-kx_ankle = np.diag([4.0, 4.0, 0.0])
-kp_ankle = np.diag([2.0, 2.0, 0.0])
+kx_ankle = 5.0 * np.diag([1.0, 1.0, 0.0])
+kp_ankle = 2.0 * np.diag([1.0, 1.0, 0.0])
 
 # Hip strategy
 r_ref = np.array([0.0, 0.0, 0.0])
