@@ -45,9 +45,18 @@ MAXLEN = 500
 
 class Talos(Robot):
     def __init__(self, simulator, urdf, model, node, q=None, verbose=True, useFixedBase=True):
-        # call base class constructor
+        '''
+        Initializes the Talos robot in simulation and sets up ROS2 publishers.
 
-        # Initial condition for the simulator an model
+        Parameters:
+        - simulator: Simulation interface (PybulletWrapper)
+        - urdf: Path to URDF file
+        - model: Robot model
+        - node: ROS2 node instance
+        - q: Initial joint configuration
+        - verbose: Print debug info if True
+        - useFixedBase: If True, base is fixed in simulation
+        '''
         z_init = 1.1
 
         super().__init__(
@@ -62,32 +71,41 @@ class Talos(Robot):
 
         self.node = node
 
-        # add publisher
         self.pub_joint = self.node.create_publisher(
             JointState, "/joint_states", 10)
 
         self.joint_msg = JointState()
         self.joint_msg.name = self.actuatedJointNames()
 
-        # add tf broadcaster
         self.br = tf2_ros.TransformBroadcaster(self.node)
 
     def update(self):
-        # update base class
+        '''
+        Updates internal simulation state from the base Robot class.
+        '''
         super().update()
 
     def publish(self, T_b_w, tau):
-        # publish jointstate
-        self.joint_msg.header.stamp = self.node.get_clock().now().to_msg()
+        '''
+        Publishes joint states and base transform to ROS2.
+
+        Parameters:
+        - T_b_w: World-to-base transform (pinocchio SE3)
+        - tau: Actuated joint torques (numpy array)
+        '''
+        now = self.node.get_clock().now().to_msg()
+
+        # Publish joint states
+        self.joint_msg.header.stamp = now
         self.joint_msg.position = self.actuatedJointPosition().tolist()
         self.joint_msg.velocity = self.actuatedJointVelocity().tolist()
         self.joint_msg.effort = tau.tolist()
 
         self.pub_joint.publish(self.joint_msg)
 
-        # broadcast transformation T_b_w
+        # Broadcast transformation T_b_w
         tf_msg = TransformStamped()
-        tf_msg.header.stamp = self.node.get_clock().now().to_msg()
+        tf_msg.header.stamp = now
         tf_msg.header.frame_id = "world"
         tf_msg.child_frame_id = self.baseName()
 
@@ -110,7 +128,24 @@ class Talos(Robot):
 
 
 class ExtPushForce:
+    '''
+    Class to model and apply an external force to a robot in simulation for a specified duration.
+    Includes visualization of the force vector in the PyBullet environment.
+    '''
+
     def __init__(self, robot, simulator, force, t_start, t_period, verbose=True, color=[1, 0, 0]):
+        '''
+        Initializes the external force object.
+
+        Parameters:
+        - robot: Robot instance
+        - simulator: Simulation interface (PybulletWrapper)
+        - force: External force vector (np.ndarray of shape (3,))
+        - t_start: Time at which to start applying the force [float]
+        - t_period: Duration for which the force is applied [float]
+        - verbose: Enable force visualization if True [bool]
+        - color: RGB color for visualization [list of float]
+        '''
         assert isinstance(force, np.ndarray), "Input must be a NumPy array."
         assert force.shape == (
             3,), f"Input must be of shape (3,), but got shape {force.shape}."
@@ -137,8 +172,13 @@ class ExtPushForce:
         self.line_removed = False
 
     def apply_force(self, t):
+        '''
+        Applies the external force to the robot if within the active time window.
+
+        Parameters:
+        - t: Current simulation time [float]
+        '''
         if t >= self.t_start and t <= self.t_end:
-            # apply force
             self.robot.applyForce(self.force)
 
             self.visualize_force()
@@ -146,11 +186,14 @@ class ExtPushForce:
         self.remove_visualization(t)
 
     def visualize_force(self):
+        '''
+        Draws or updates a debug line to visualize the direction and location of the applied force.
+        '''
         if self.verbose:
-            # update debug arrow for high CoM deviations
             p2 = np.array(self.robot.baseCoMPosition())
             if self.line_id is not None:
                 if (np.abs(p2 - self.p2_old) > 0.01).any():
+                    # Update debug arrow for high CoM deviations
                     p1 = p2 - self.direction
                     self.simulator.removeDebugItem(self.line_id)
                     self.line_id = self.simulator.addGlobalDebugLine(
@@ -163,8 +206,13 @@ class ExtPushForce:
                 self.p2_old = p2
 
     def remove_visualization(self, t):
-        if t > self.t_end and not self.line_removed:
-            # remove debug line after period
+        '''
+        Removes the force visualization line once the force application period ends.
+
+        Parameters:
+        - t: Current simulation time [float]
+        '''
+        if t > self.t_end and not self.line_removed and self.verbose:
             self.simulator.removeDebugItem(self.line_id)
             self.line_removed = True
 
@@ -175,15 +223,24 @@ class ExtPushForce:
 
 
 class BalanceController:
+    '''
+    Balance controller that combines ankle and hip strategies to stabilize the robot.
+    '''
+
     def __init__(self, robot, tsid_wrapper, verbose=True):
         '''
-        Balance controller with ankle & hip strategy
+        Initialize the balance controller.
+
+        Parameters:
+        - robot: Robot instance
+        - tsid_wrapper: TSID instance
+        - verbose: Flag to enable debug messages
         '''
         self.robot = robot
         self.tsid_wrapper = tsid_wrapper
         self.verbose = verbose
 
-        # ankle strategy parameters
+        # Ankle strategy parameters
         self.x_ref = conf.x_ref
         self.p_ref = conf.p_ref
         self.K_x_ankle = conf.kx_ankle
@@ -192,44 +249,57 @@ class BalanceController:
         self.delta_x_com = np.array([0.0, 0.0, 0.0])
         self.max_offset = np.array([0.03, 0.08, 0.0])
 
-        # hip strategy parameters
+        # Hip strategy parameters
         self.r_ref = conf.r_ref
         self.K_gamma_hip = conf.kgamma_hip
 
     def ankle_strategy(self, dt, x_d, p, x_ref_dot=None):
         '''
-        Ankle balance strategy for small disturbances
+        Applies the ankle strategy for minor balance corrections.
+
+        Parameters:
+        - dt: Time step [float]
+        - x_d: Current CoM position [np.ndarray, shape (3,)]
+        - p: Estimated ZMP (Zero Moment Point) position [np.ndarray, shape (3,)]
+        - x_ref_dot: Desired CoM velocity (optional) [np.ndarray, shape (3,)]
+
+        Updates:
+        - Modifies the CoM reference
         '''
 
         if x_ref_dot is None:
-            # standing condition
+            # Assume zero velocity in standing phase
             x_ref_dot = np.zeros_like(p)
 
         d_x = x_d - self.x_ref
         d_p = p - self.p_ref
 
-        # x_d_dot: new desired velocity for CoM
+        # Compute corrective CoM velocity
         x_d_dot = x_ref_dot - self.K_x_ankle @ d_x + self.K_p_ankle @ d_p
 
-        # integrate velocity
+        # Integrate and clip the corrective offset
         self.delta_x_com += x_d_dot * dt
-
-        # clip delta to prevent drift
         self.delta_x_com = np.clip(
             self.delta_x_com, -self.max_offset, self.max_offset)
 
+        # Update CoM reference position
         x_com = self.x_ref + self.delta_x_com
-
         self.tsid_wrapper.setComRefState(x_com, x_d_dot)
 
     def hip_strategy(self, r):
         '''
-        Hip balance strategy for higher disturbances
+        Applies the hip strategy for significant disturbances.
+
+        Parameters:
+        - r: Estimated Centroidal Moment Pivot (CMP) [np.ndarray, shape (3,)]
+
+        Updates:
+        - Modifies the desired angular momentum
         '''
-        # Gamma_d: desired angular momentum
+        # Compute desired angular momentum
         Gamma_d = self.K_gamma_hip @ (r - self.r_ref)
 
-        # set angular momentum (am) task
+        # Update angular momentum
         am_traj = tsid.TrajectorySample(3)
         am_traj.value(Gamma_d)
         self.tsid_wrapper.amTask.setReference(am_traj)
@@ -241,20 +311,26 @@ class BalanceController:
 
 
 class Environment(Node):
+    '''
+    Main ROS2 node managing simulation and control of the Talos robot.
+    It interfaces the TSID controller, PyBullet simulation, and ROS2 communication.
+    '''
+
     def __init__(self):
-        super().__init__('tutorial_4_standing_node')
+        '''
+        Initializes the simulation environment, robot, and controller.
+        '''
+        super().__init__('tutorial_5_torque_crtl_node')
 
-        # init TSIDWrapper (including CoM & whole-body angular momentum tasks)
         self.tsid_wrapper = TSIDWrapper(conf)
-
-        # init Simulator
         self.simulator = PybulletWrapper(sim_rate=conf.f_cntr)
 
-        # use q_init for robot initialization, as conf.q_home results in error
-        q_init = np.hstack([np.array([0, 0, 1.1, 0, 0, 0, 1]),
-                           np.zeros_like(conf.q_actuated_home)])
+        # Use q_init for robot initialization, as conf.q_home results in error
+        q_init = np.hstack([
+            np.array([0, 0, 1.15, 0, 0, 0, 1]),
+            np.zeros_like(conf.q_actuated_home)
+        ])
 
-        # init ROBOT
         self.robot = Talos(
             self.simulator,
             conf.urdf,
@@ -264,10 +340,9 @@ class Environment(Node):
             verbose=True,
             useFixedBase=False)
 
-        # init Balance Controller
         self.balance_crtl = BalanceController(self.robot, self.tsid_wrapper)
 
-        # init external forces
+        # Initialize external forces
         force = 60.0
         f_right = force * np.array([0.0, 1.0, 0.0])
         f_left = force * np.array([0.0, -1.0, 0.0])
@@ -279,7 +354,7 @@ class Environment(Node):
         self.f_ext_back = ExtPushForce(
             self.robot, self.simulator, f_back, 8.0, 0.5)
 
-        # add force-torque sensors at ankles
+        # Add force-torque sensors in ankle coordinate frame
         pb.enableJointForceTorqueSensor(
             self.robot.id(),
             self.robot.jointNameIndexMap()['leg_right_6_joint'],
@@ -291,13 +366,13 @@ class Environment(Node):
 
         self.t_publish = 0.0
 
-        # current estimates
+        # Current estimates of ground reference points
         self.zmp_curr_est = None
         self.cmp_curr_est = None
         self.cp_curr_est = None
         self.f_total = None
 
-        # logging
+        # Logging
         if USE_MAXLEN:
             self.time = deque(maxlen=MAXLEN)
             self.zmp_x = deque(maxlen=MAXLEN)
@@ -319,8 +394,7 @@ class Environment(Node):
             self.com_x = []
             self.com_y = []
 
-        # plotting (PyQtGraph UI setup)
-        # PyQt App setup
+        # Plotting
         if DO_PLOT:
             self.app = QtWidgets.QApplication([])
             self.win = pg.GraphicsLayoutWidget(
@@ -385,13 +459,19 @@ class Environment(Node):
             self.plot_com_y.showGrid(x=True, y=True)
             self.curve_com_y = self.plot_com_y.plot(pen='m', name='CoM Y')
 
-            # Set up timer for update loop
+            # Set timer for update loop
             self.timer = QtCore.QTimer()
             self.timer.timeout.connect(self.update_plot)
             self.timer.start(50)  # 20 Hz
 
     def get_ankle_wrenches(self):
-        # read ankle wrenches
+        """
+        Reads ankle joint wrenches and constructs pinocchio Force objects.
+
+        Returns:
+        - wr_rankle: Wrench at right ankle (pin.Force)
+        - wl_lankle: Wrench at left ankle (pin.Force)
+        """
         wren_r = pb.getJointState(
             self.robot.id(),
             self.robot.jointNameIndexMap()['leg_right_6_joint'])[2]
@@ -409,8 +489,13 @@ class Environment(Node):
         return wr_rankle, wl_lankle
 
     def get_ankle_transf(self):
+        """
+        Computes transformations of ankle and sole frames to the world frame.
 
-        # get positions of ankles and soles
+        Returns:
+        - H_w_rankle, H_w_lankle: Right/left ankle to world transforms
+        - H_w_rsole, H_w_lsole: Right/left sole to world transforms
+        """
         data = self.robot._model.createData()
         pin.framesForwardKinematics(self.robot._model, data, self.robot.q())
 
@@ -423,16 +508,17 @@ class Environment(Node):
         return H_w_rankle, H_w_lankle, H_w_rsole, H_w_lsole
 
     def estimate_ZMP(self):
-        # estimate the Zero Moment Point
-        d = 0.1
+        """
+        Estimates the Zero Moment Point (ZMP) in world coordinates.
+        Stores result in `self.zmp_curr_est` and total ground reaction force in `self.f_total`.
+        """
+        d = 0.1  # vertical offset
 
-        # get wrenches (6 joint coordinate frame)
+        # Read wrenches and frame transforms
         wr_ankle, wl_ankle = self.get_ankle_wrenches()
-
-        # get positions of ankles and soles
         H_w_rankle, H_w_lankle, H_w_rsole, H_w_lsole = self.get_ankle_transf()
 
-        # function for calculating the zmp of the respective foot
+        # Function for calculating the ZMP of the respective foot
         def calc_foot_zmp(wrench):
             tau_x, tau_y, tau_z = wrench.angular
             f_x, f_y, f_z = wrench.linear
@@ -445,29 +531,29 @@ class Environment(Node):
             p_z = 0
             return np.array([p_x, p_y, p_z])
 
-        # function for calculating the double support zmp
+        # Function for calculating the double support ZMP
         def calc_zmp(pR, pL, fR_z, fL_z):
             pR_x, pR_y, pR_z = pR
             pL_x, pL_y, pL_z = pL
 
-            # calculate zmp
+            # Calculate zmp
             p_x_zmp = (pR_x * fR_z + pL_x * fL_z) / (fR_z + fL_z)
             p_y_zmp = (pR_y * fR_z + pL_y * fL_z) / (fR_z + fL_z)
             return np.array([p_x_zmp, p_y_zmp, 0.0])
 
-        # right & left foot zmp (foot/sole coordinate frame)
+        # Estimate per-foot ZMP in sole frames
         p_R = calc_foot_zmp(wr_ankle)
         p_L = calc_foot_zmp(wl_ankle)
 
-        # Transform points (p_L & p_R) to world frame
+        # Convert per-foot ZMP to world coordinates
         w_p_R = H_w_rsole * p_R
         w_p_L = H_w_lsole * p_L
 
-        # calculate zmp for double support
+        # Calculate ZMP for double support
         self.zmp_curr_est = calc_zmp(
             w_p_R, w_p_L, wr_ankle.linear[2], wl_ankle.linear[2])
 
-        # Transform ground reaction force to zmp
+        # Transform wrenches to ZMP frame
         w_H_zmp = pin.SE3(np.eye(3), self.zmp_curr_est)
         wr_zmp = w_H_zmp.inverse() * H_w_rankle * wr_ankle
         wl_zmp = w_H_zmp.inverse() * H_w_lankle * wl_ankle
@@ -475,7 +561,9 @@ class Environment(Node):
         self.f_total = wr_zmp.linear + wl_zmp.linear
 
     def estimate_CMP(self):
-        # estimate the Centroidal Moment Pivot
+        """
+        Estimates the Centroidal Moment Pivot (CMP).
+        """
         p_com = self.robot.baseCoMPosition()
         f = self.get_f_total()
         X_x, X_y, X_z = p_com
@@ -488,7 +576,9 @@ class Environment(Node):
         self.cmp_curr_est = np.array([r_x, r_y, r_z])
 
     def estimate_CP(self):
-        # estimate the Capture point (CP) / Divergent Component of Motion (DCM)
+        """
+        Estimates the Capture Point (CP) / Divergent Component of Motion (DCM).
+        """
         x_CoM = self.robot.baseCoMPosition()
         x_p = np.array([x_CoM[0], x_CoM[1], 0.0])
         x_p_dot = self.robot.baseCoMVelocity()
@@ -498,25 +588,36 @@ class Environment(Node):
         self.cp_curr_est = x_p + x_p_dot/omega
 
     def compute_estimates(self):
-        # compute all estimates
+        """
+        Updates estimates of ground reference points.
+        """
         self.estimate_ZMP()
         self.estimate_CMP()
         self.estimate_CP()
 
     def get_zmp(self):
+        """Returns current estimated ZMP (3D vector)."""
         return self.zmp_curr_est
 
     def get_cmp(self):
+        """Returns current estimated CMP (3D vector)."""
         return self.cmp_curr_est
 
     def get_cp(self):
+        """Returns current estimated Capture Point (3D vector)."""
         return self.cp_curr_est
 
     def get_f_total(self):
+        """Returns current total ground reaction force at the ZMP frame (3D vector)."""
         return self.f_total
 
     def logging(self, t):
-        # log the x and y components of ground reference points and CoM
+        """
+        Records time series data for ZMP, CMP, CP, and CoM for plotting.
+
+        Parameters:
+        - t: Current time (float)
+        """
         p_zmp = self.get_zmp()
         p_cmp = self.get_cmp()
         p_cp = self.get_cp()
@@ -533,7 +634,9 @@ class Environment(Node):
         self.com_y.append(p_com[1])
 
     def update_plot(self):
-        # Set data to curves
+        """
+        Updates real-time plot of the estimated quantities.
+        """
         if len(self.time) > 0 and DO_PLOT:
             self.curve_zmp_x.setData(self.time, self.zmp_x)
             self.curve_cmp_x.setData(self.time, self.cmp_x)
@@ -546,42 +649,45 @@ class Environment(Node):
             self.curve_com_y.setData(self.time, self.com_y)
 
     def update(self):
-        # elapsed time
+        '''
+        Simulation and Contol loop
+        '''
+        # Elapsed time
         t = self.simulator.simTime()
         dt = self.simulator.stepTime()
 
-        # update the simulator and the robot
+        # Update the simulator and the robot
         self.simulator.step()
         self.simulator.debug()
         self.robot.update()
 
-        # compute estimates
+        # Compute estimates of ground reference points
         self.compute_estimates()
 
-        # apply forces
+        # Apply external forces
         self.f_ext_right.apply_force(t)
         self.f_ext_left.apply_force(t)
         self.f_ext_back.apply_force(t)
 
-        # balance strategy
+        # Execute balance strategy
         self.balance_crtl.ankle_strategy(
             dt, self.tsid_wrapper.comState().value(), self.get_zmp())
         self.balance_crtl.hip_strategy(self.get_cmp())
 
-        # update TSID controller
+        # Update TSID controller
         tau_sol, _ = self.tsid_wrapper.update(
             self.robot.q(), self.robot.v(), t)
 
-        # command to the robot
+        # Command to the robot
         self.robot.setActuatedJointTorques(tau_sol)
 
-        # logging
+        # Logging
         self.logging(t)
 
-        # publish to ros
+        # Publish to ros
         if t - self.t_publish > 1./30.:
             self.t_publish = t
-            # get current BASE Pose
+            # Get current BASE Pose
             T_b_w, _ = self.tsid_wrapper.baseState()
             self.robot.publish(T_b_w, tau_sol)
 
@@ -603,7 +709,7 @@ def main(args=None):
     rclpy.init(args=args)
     env = Environment()
 
-    # threading for faster simulation with plots
+    # Threading for faster simulation with plots
     if THREADING and DO_PLOT:
         ros_thread = threading.Thread(target=ros_spin_thread, args=(env,))
         ros_thread.start()
