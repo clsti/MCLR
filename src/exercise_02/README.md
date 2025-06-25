@@ -40,10 +40,9 @@ ros2 run body_control squatting
 
 ## Tutorial 5
 ##### Notes: 
-- To stop the program, please close the plot/diagram window.
-- In case of import errors:
-  - Please install PyQt5 (version 5.15.10), or
-  - Set the variable `DO_PLOT = False` to deactivate plotting (& comment imports).
+- Check if plotting library is installed: `pip3 list | grep PyQt5`
+  Install PyQt5 (version 5.15.10) for visualization
+- In the case of using the visualization: To stop the program, please close the plot/diagram window.
 - Threading is used to speed up the simulation. You can disable it by setting `THREADING = False`.
 - To reduce plotting computation, you can limit the maximum number of time steps by enabling `USE_MAXLEN = True` and setting `MAXLEN = 500`.
 
