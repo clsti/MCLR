@@ -36,9 +36,19 @@ DO_PLOT = True
 
 class Talos(Robot):
     def __init__(self, simulator, urdf, model, node, q=None, verbose=True, useFixedBase=True):
-        # call base class constructor
+        '''
+        Initializes the Talos robot in simulation and sets up ROS2 publishers.
 
-        # Initial condition for the simulator an model
+        Parameters:
+        - simulator: Simulation interface (PybulletWrapper)
+        - urdf: Path to URDF file
+        - model: Robot model
+        - node: ROS2 node instance
+        - q: Initial joint configuration
+        - verbose: Print debug info if True
+        - useFixedBase: If True, base is fixed in simulation
+        '''
+
         z_init = 1.15
 
         super().__init__(
@@ -53,32 +63,42 @@ class Talos(Robot):
 
         self.node = node
 
-        # add publisher
         self.pub_joint = self.node.create_publisher(
             JointState, "/joint_states", 10)
 
         self.joint_msg = JointState()
         self.joint_msg.name = self.actuatedJointNames()
 
-        # add tf broadcaster
         self.br = tf2_ros.TransformBroadcaster(self.node)
 
     def update(self):
-        # update base class
+        '''
+        Updates internal simulation state from the base Robot class.
+        '''
         super().update()
 
     def publish(self, T_b_w, tau):
-        # publish jointstate
-        self.joint_msg.header.stamp = self.node.get_clock().now().to_msg()
+        '''
+        Publishes joint states and base transform to ROS2.
+
+        Parameters:
+        - T_b_w: Base-to-world transform (pinocchio SE3)
+        - tau: Actuated joint torques (numpy array)
+        '''
+
+        now = self.node.get_clock().now().to_msg()
+
+        # Publish joint states
+        self.joint_msg.header.stamp = now
         self.joint_msg.position = self.actuatedJointPosition().tolist()
         self.joint_msg.velocity = self.actuatedJointVelocity().tolist()
         self.joint_msg.effort = tau.tolist()
 
         self.pub_joint.publish(self.joint_msg)
 
-        # broadcast transformation T_b_w
+        # Broadcast transformation T_b_w
         tf_msg = TransformStamped()
-        tf_msg.header.stamp = self.node.get_clock().now().to_msg()
+        tf_msg.header.stamp = now
         tf_msg.header.frame_id = "world"
         tf_msg.child_frame_id = self.baseName()
 
@@ -102,20 +122,26 @@ class Talos(Robot):
 
 
 class Environment(Node):
+    '''
+    Main ROS2 node managing simulation and control of the Talos robot.
+    It interfaces the TSID controller, PyBullet simulation, and ROS2 communication.
+    '''
+
     def __init__(self):
+        '''
+        Initializes the simulation environment, robot, and controller.
+        '''
         super().__init__('tutorial_4_standing_node')
 
-        # init TSIDWrapper
         self.tsid_wrapper = TSIDWrapper(conf)
-
-        # init Simulator
         self.simulator = PybulletWrapper(sim_rate=conf.f_cntr)
 
-        # use q_init for robot initialization, as conf.q_home results in error
-        q_init = np.hstack([np.array([0, 0, 1.15, 0, 0, 0, 1]),
-                           np.zeros_like(conf.q_actuated_home)])
+        # Use q_init for robot initialization, as conf.q_home results in error
+        q_init = np.hstack([
+            np.array([0, 0, 1.15, 0, 0, 0, 1]),
+            np.zeros_like(conf.q_actuated_home)
+        ])
 
-        # init ROBOT
         self.robot = Talos(
             self.simulator,
             conf.urdf,
@@ -128,25 +154,28 @@ class Environment(Node):
         self.t_publish = 0.0
 
     def update(self):
-        # elapsed time
+        '''
+        Simulation and Contol loop
+        '''
+        # Elapsed time
         t = self.simulator.simTime()
 
-        # update the simulator and the robot
+        # Update the simulator and the robot
         self.simulator.step()
         self.simulator.debug()
         self.robot.update()
 
-        # update TSID controller
+        # Update TSID controller
         tau_sol, _ = self.tsid_wrapper.update(
             self.robot.q(), self.robot.v(), t)
 
-        # command to the robot
+        # Command to the robot
         self.robot.setActuatedJointTorques(tau_sol)
 
-        # publish to ros
+        # Publish to ros
         if t - self.t_publish > 1./30.:
             self.t_publish = t
-            # get current BASE Pose
+            # Get current BASE Pose
             T_b_w, _ = self.tsid_wrapper.baseState()
             self.robot.publish(T_b_w, tau_sol)
 
