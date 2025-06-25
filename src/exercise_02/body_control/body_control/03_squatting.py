@@ -42,13 +42,12 @@ class Talos(Robot):
         Parameters:
         - simulator: Simulation interface (PybulletWrapper)
         - urdf: Path to URDF file
-        - model: Pinocchio model
+        - model: Robot model
         - node: ROS2 node instance
         - q: Initial joint configuration
         - verbose: Print debug info if True
         - useFixedBase: If True, base is fixed in simulation
         '''
-
         z_init = 1.15
 
         super().__init__(
@@ -85,7 +84,6 @@ class Talos(Robot):
         - T_b_w: Base-to-world transform (pinocchio SE3)
         - tau: Actuated joint torques (numpy array)
         '''
-
         now = self.node.get_clock().now().to_msg()
 
         # Publish joint states
@@ -130,7 +128,7 @@ class Environment(Node):
         '''
         Initializes the simulation environment, robot, and controller.
         '''
-        super().__init__('tutorial_4_standing_node')
+        super().__init__('tutorial_4_squatting_node')
 
         self.tsid_wrapper = TSIDWrapper(conf)
         self.simulator = PybulletWrapper(sim_rate=conf.f_cntr)
@@ -213,7 +211,6 @@ class Environment(Node):
         - z_dot: Velocity in Z [float]
         - z_ddot: Acceleration in Z [float]
         '''
-
         z = self.wave_amp * np.sin(t * self.omega_squat)
         z_dot = self.wave_amp * self.omega_squat * np.cos(t * self.omega_squat)
         z_ddot = - self.wave_amp * self.omega_squat**2 * \
@@ -232,7 +229,6 @@ class Environment(Node):
         - vel: Velocity trajectory [3 x len(t) ndarray]
         - acc: Acceleration trajectory [3 x len(t) ndarray]
         '''
-
         dx = 0.0 * t
         dy = self.arm_radius * np.cos(self.arm_omega * t)
         dz = self.arm_radius * np.sin(self.arm_omega * t)
@@ -340,7 +336,6 @@ class Environment(Node):
         - title: Title for the plot [str]
         - crop: Y-axis limits as (min, max) [tuple (optional)]
         '''
-
         labels = ['X', 'Y', 'Z']
         t = np.array(self.plot_time)
         ref = np.array(data_ref)
@@ -366,7 +361,6 @@ class Environment(Node):
         Parameters:
         - t: Current time in simulation [float]
         '''
-
         self.plot_time.append(t)
         com_tsid = self.tsid_wrapper.comState()
         self.plot_tsid_pos.append(com_tsid.value())
@@ -393,7 +387,6 @@ class Environment(Node):
         '''
         Renders the position, velocity, and acceleration plots in real-time using logged data.
         '''
-
         self.update_figure(self.axs_pos, self.plot_tsid_pos,
                            self.plot_ref_pos, self.plot_gt_pos, "Position")
         self.update_figure(self.axs_vel, self.plot_tsid_vel,

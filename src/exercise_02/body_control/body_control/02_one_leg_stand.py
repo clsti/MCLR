@@ -42,13 +42,12 @@ class Talos(Robot):
         Parameters:
         - simulator: Simulation interface (PybulletWrapper)
         - urdf: Path to URDF file
-        - model: Pinocchio model
+        - model: Robot model
         - node: ROS2 node instance
         - q: Initial joint configuration
         - verbose: Print debug info if True
         - useFixedBase: If True, base is fixed in simulation
         '''
-
         z_init = 1.15
 
         super().__init__(
@@ -85,7 +84,6 @@ class Talos(Robot):
         - T_b_w: Base-to-world transform (pinocchio SE3)
         - tau: Actuated joint torques (numpy array)
         '''
-
         now = self.node.get_clock().now().to_msg()
 
         # Publish joint states
@@ -130,7 +128,7 @@ class Environment(Node):
         '''
         Initializes the simulation environment, robot, and controller.
         '''
-        super().__init__('tutorial_4_standing_node')
+        super().__init__('tutorial_4_one_leg_stand_node')
 
         self.tsid_wrapper = TSIDWrapper(conf)
         self.simulator = PybulletWrapper(sim_rate=conf.f_cntr)

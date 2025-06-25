@@ -48,7 +48,6 @@ class Talos(Robot):
         - verbose: Print debug info if True
         - useFixedBase: If True, base is fixed in simulation
         '''
-
         z_init = 1.15
 
         super().__init__(
@@ -85,7 +84,6 @@ class Talos(Robot):
         - T_b_w: Base-to-world transform (pinocchio SE3)
         - tau: Actuated joint torques (numpy array)
         '''
-
         now = self.node.get_clock().now().to_msg()
 
         # Publish joint states
