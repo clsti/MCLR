@@ -81,7 +81,7 @@ class Talos(Robot):
         Publishes joint states and base transform to ROS2.
 
         Parameters:
-        - T_b_w: Base-to-world transform (pinocchio SE3)
+        - T_b_w: World-to-base transform (pinocchio SE3)
         - tau: Actuated joint torques (numpy array)
         '''
         now = self.node.get_clock().now().to_msg()
