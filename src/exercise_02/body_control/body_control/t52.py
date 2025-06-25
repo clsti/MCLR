@@ -19,7 +19,7 @@ from simulator.robot import Robot
 # robot and controller
 import tsid
 from body_control.tsid_wrapper import TSIDWrapper
-import body_control.config_51 as conf
+import body_control.config_52 as conf
 
 # ROS
 import rclpy
@@ -264,11 +264,16 @@ class Environment(Node):
             verbose=True,
             useFixedBase=False)
 
+        # initialize virtual robot state with current state & zero velocity
+        self.q_tsid = self.robot.q().copy()
+        self.v_tsid = np.zeros_like(self.robot.v())
+        self.n_integrate = int(1./(self.simulator.stepTime()*100))
+
         # init Balance Controller
         self.balance_crtl = BalanceController(self.robot, self.tsid_wrapper)
 
         # init external forces
-        force = 30.0
+        force = 70.0
         f_right = force * np.array([0.0, 1.0, 0.0])
         f_left = force * np.array([0.0, -1.0, 0.0])
         f_back = force * np.array([1.0, 0.0, 0.0])
@@ -569,11 +574,14 @@ class Environment(Node):
         self.balance_crtl.hip_strategy(self.get_cmp())
 
         # update TSID controller
-        tau_sol, _ = self.tsid_wrapper.update(
+        tau_sol, dv_sol = self.tsid_wrapper.update(
             self.robot.q(), self.robot.v(), t)
 
-        # command to the robot
-        self.robot.setActuatedJointTorques(tau_sol)
+        # integrate solution in virtual state
+        if (t/dt) % self.n_integrate == 0:
+            self.q_tsid, self.v_tsid = self.tsid_wrapper.integrate_dv(
+                self.q_tsid, self.v_tsid, dv_sol, self.n_integrate * dt)
+            self.robot.setActuatedJointPositions(self.q_tsid, self.v_tsid)
 
         # logging
         self.logging(t)

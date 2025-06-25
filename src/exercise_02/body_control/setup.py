@@ -23,7 +23,8 @@ setup(
             'standing = body_control.01_standing:main',
             'one_leg_stand = body_control.02_one_leg_stand:main',
             'squatting = body_control.03_squatting:main',
-            't51 = body_control.t51:main'
+            't51 = body_control.t51:main',
+            't52 = body_control.t52:main'
         ],
     },
 )
