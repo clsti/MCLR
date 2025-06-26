@@ -15,7 +15,7 @@ urdf = os.path.join("exercise_02", talos_description,
                     "robots/talos_reduced_no_hands.urdf")
 path = os.path.join("exercise_02", talos_description, "meshes/../..")
 
-dt = 0.002                                      # controller time step
+dt = 0.001                                      # controller time step
 f_cntr = 1.0/dt                                 # controller freq
 na = 30                                         # number of actuated
 

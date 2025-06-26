@@ -353,7 +353,7 @@ class Environment(Node):
         # Initialize virtual robot state with current state & zero velocity
         self.q_tsid = self.robot.q().copy()
         self.v_tsid = np.zeros_like(self.robot.v())
-        self.n_integrate = int(1./(self.simulator.stepTime()*100))
+        self.n_integrate = int(1./(self.simulator.stepTime()*200))
 
         # Initialize external forces
         force = 70.0
