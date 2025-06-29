@@ -1,0 +1,18 @@
+Questions - Tutorial 6
+
+a Task 1: Getting familiar
+
+- What is the meaning of the variables h?
+  The variable h represents the time step duration between each discret state transition. Each time step does not necessarily have fixed duration. It is treated as an optimization variable constrained by h_min and h_max, allowing the solver to adjust the timing dynamically.
+
+- What happens if we add constraints on the magnitude u(t)?
+  In dependence of the maximum torque |tau| <= tau_limit, the pendulum might no longer have sufficient force to reach its goal position in a single direct motion. Instead, it might needs to swing back and forth to build enough up enough energy to be able to reach the goal position in a final swing.
+
+- What is the difference of this pendulum problem compared to the CoM trajectory optimization
+  (hint look at their dynamics equations)?
+  The Pendulum dynamics are non-linear and non-convex: ml^2 q_ddot(t) + mglsin(q(t)) = -b q_dot(t) + u(t)
+  The CoM trajectory optimization is linear/affine, easier to optimize with convex programming methods: c_ddot_xy = g/h (c_xy - p_xy)
+
+- What is the meaning of the term S*sum(h) ?
+  S is a scalar weight and sum(h) is he total duration. By adding this term to the cost, the optimization tries to find a fast trajectory.
+  Together with R, it creates a trade-off between energy use and speed

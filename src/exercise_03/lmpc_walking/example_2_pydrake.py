@@ -22,12 +22,12 @@ Control:    u = tau \in R            (torque of a motor)
 Please ckeck the pdf and TODOs in this file.
 """
 
+import pydrake.symbolic as sym
+from pydrake.all import (MathematicalProgram, Solve, SnoptSolver)
 import numpy as np
 import matplotlib.pyplot as plt
 plt.style.use('seaborn-dark')
 
-from pydrake.all import (MathematicalProgram, Solve, SnoptSolver)
-import pydrake.symbolic as sym
 
 ################################################################################
 # settings
@@ -42,7 +42,7 @@ b = 0.1         # viscous friction of the pendulm
 
 # Solver Parameters:
 # --------------
-N       = 350   # number of steps / our problem horizon
+N = 350   # number of steps / our problem horizon
 
 # The minimum and maximum Timeteps limits h
 h_min = .002    # 500 Hz
@@ -52,9 +52,11 @@ h_max = .05     # 100 Hz
 # helper function for visualization and dynamics
 ################################################################################
 
+
 class Visualizer():
     """Visualize the pendulum
     """
+
     def __init__(self, ax, length):
         """init visualizer
 
@@ -68,10 +70,10 @@ class Visualizer():
         self.ax.set_ylim(-1, 1)
 
         self.link = np.vstack((0.025 * np.array([1, -1, -1, 1, 1]),
-                        length * np.array([0, 0, -1, -1, 0])))
+                               length * np.array([0, 0, -1, -1, 0])))
 
         self.link_fill = ax.fill(
-                self.link[0, :], self.link[1, :], zorder=1, edgecolor="k", facecolor=[.6, .6, .6])
+            self.link[0, :], self.link[1, :], zorder=1, edgecolor="k", facecolor=[.6, .6, .6])
 
     def draw(self, time, q):
         R = np.array([[np.cos(q), np.sin(q)], [-np.sin(q), np.cos(q)]])
@@ -92,13 +94,17 @@ def pendulum_continous_dynamics(x, u):
     Returns:
         _type_: the two dimensional time derivative x_dot=[q_dot, q_ddot]
     """
-    
+
     # use object d to get math functions such as (d.sin, d.log, etc.)
     d = sym if x.dtype == object else np
 
-    #>>>>TODO: add continous state space equation and return x_dot
-    x_dot = None
+    # Continous state space equation
+    x_dot = np.array([
+        x[1],
+        (u - b * x[1] - m * g * l * d.sin(x[0])) / (m * l**2)
+    ])
     return x_dot
+
 
 def pendulum_discretized_dynamics(x, u, x_next, dt):
     """descritization of the continous dynamics.
@@ -117,14 +123,16 @@ def pendulum_discretized_dynamics(x, u, x_next, dt):
         _type_: the residual between euler integration and x_next
     """
 
-    #>>>>TODO: compute x_dot integrated it using x and dt. Return the
+    # Integrate state
+    x_pred = x + pendulum_continous_dynamics(x, u) * dt
     # residual to x_next
-    residuals=None
+    residuals = x_next - x_pred
     return residuals
 
 ################################################################################
 # problem definition
 ################################################################################
+
 
 # the important dimension in this problem
 nx = 2  # dimension of our state x=[q, q_dot]
@@ -138,8 +146,8 @@ x_intial = np.array([0.0, 0.0])
 # and should have zero acceleration
 x_final = np.array([np.pi, 0.0])
 
-# Define an instance of MathematicalProgram 
-prog = MathematicalProgram() 
+# Define an instance of MathematicalProgram
+prog = MathematicalProgram()
 
 ################################################################################
 # variables
@@ -155,25 +163,26 @@ h = prog.NewContinuousVariables(N, name='h')
 # 1. we want our pendulum to start with the inital state x_init
 # For this we can add an equality constraint to the first time step k=0
 for i in range(nx):
-    prog.AddConstraint(state[0,i] == x_intial[i])
+    prog.AddConstraint(state[0, i] == x_intial[i])
 
 # 2. we want our pendulum to end with the final state k=N
 # For this we can add an equality to the last time step k=N
 for i in range(nx):
-    prog.AddConstraint(state[N-1,i] == x_final[i])
+    prog.AddConstraint(state[N-1, i] == x_final[i])
 
 # 3. add any timestep we want our solution to respect the dynamics of the pendulum
 # That means the next state x_k+1 should be the integral of the prev. state x_k
 for k in range(N-1):
-    residuals = pendulum_discretized_dynamics(state[k], control[k], state[k+1], h[k])
+    residuals = pendulum_discretized_dynamics(
+        state[k], control[k], state[k+1], h[k])
     for i in range(nx):
         prog.AddConstraint(residuals[i] == 0)
 
 prog.AddBoundingBoxConstraint([h_min]*N, [h_max]*N, h)
 
 # 4. add a constrain on the control torque
-#>>>>TODO: After, you simulated the unconstraint case. 
-#>>>>TODO: Add some limits on the control torque between some min and max value
+torque_min, torque_max = (-5.0, 5.0)
+prog.AddBoundingBoxConstraint([torque_min]*N, [torque_max]*N, control)
 
 
 ################################################################################
@@ -182,11 +191,11 @@ prog.AddBoundingBoxConstraint([h_min]*N, [h_max]*N, h)
 # in this example there are three costs:
 # 1) minimize the control effort: u*R*u
 # 2) get closer to the goal: (x - x_goal)^T*Q*(x - x_goal)
-# 3) ####TODO: What is the meaning of the term S*sum(h) ?
+# 3) get fast trajectories/minimize duration: S*sum(h)
 
-Q = np.array([[500, 0],[0, 500]])
+Q = np.array([[500, 0], [0, 500]])
 R = 10
-S = 100 
+S = 100
 
 for k in range(N):
     prog.AddCost(control[k]*R*control[k])
@@ -212,14 +221,14 @@ h_opt = result.GetSolution(h)
 
 # seperate into variables
 t_opt = np.cumsum(h_opt)
-q_opt = state_opt[:-1,0]
-q_dot_opt = state_opt[:-1,1]
+q_opt = state_opt[:-1, 0]
+q_dot_opt = state_opt[:-1, 1]
 torque_opt = control_opt
 
 ################################################################################
 # plot some stuff
 
-fig, ax = plt.subplots(1,1)
+fig, ax = plt.subplots(1, 1)
 vis = Visualizer(ax, length=l)
 for k in range(N):
     if h_opt[k] > h_min:
@@ -227,16 +236,19 @@ for k in range(N):
         plt.pause(h_opt[k])
 
 # x-axis pos, vel
-fig, ax = plt.subplots(3,1, figsize=(12, 10))
+fig, ax = plt.subplots(3, 1, figsize=(12, 10))
 ax[0].plot(t_opt, q_opt, linewidth=2, label="Position")
-ax[0].grid();ax[0].legend();ax[0].set_ylabel("Postion [rad]")
+ax[0].grid()
+ax[0].legend()
+ax[0].set_ylabel("Postion [rad]")
 ax[1].plot(t_opt, q_dot_opt, linewidth=2, label="Velocity")
-ax[1].grid();ax[1].legend();ax[1].set_ylabel("Velocity [rad/s]")
+ax[1].grid()
+ax[1].legend()
+ax[1].set_ylabel("Velocity [rad/s]")
 ax[2].plot(t_opt, torque_opt, linewidth=2, label="Torque")
-ax[2].grid();ax[2].legend();ax[2].set_ylabel("Torque [Nm]");ax[2].set_xlabel("Time [s]")
+ax[2].grid()
+ax[2].legend()
+ax[2].set_ylabel("Torque [Nm]")
+ax[2].set_xlabel("Time [s]")
 
 plt.show()
-
-
-
-
