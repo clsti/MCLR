@@ -3,7 +3,7 @@
 The goal of this file is to formulate the optimal control problem (OCP)
 in equation 12 but this time as a model predictive controller (MPC).
 
-In this case we will solve the trajectory planning multiple times over 
+In this case we will solve the trajectory planning multiple times over
 a shorter horizon of just 2 steps (receding horizon).
 Time between two MPC updates is called T_MPC.
 
@@ -77,7 +77,7 @@ NO_SIM_SAMPLES = int(round(NO_STEPS*STEP_TIME/T_SIM))
 
 
 def generate_foot_steps(foot_step_0, step_size_x, no_steps):
-    """Write a function that generates footstep of stepsize=step_size_x in the 
+    """Write a function that generates footstep of stepsize=step_size_x in the
     x direction starting from foot_step_0 located at (x0, y0).
 
     Args:
@@ -275,7 +275,7 @@ class MPC:
         self.ZMP_ref_k = None
 
     def buildSolveOCP(self, x_k, ZMP_ref_k, terminal_idx):
-        """ build the MathematicalProgram that solves the mpc problem and 
+        """ build the MathematicalProgram that solves the mpc problem and
         returns the first command of U_k
 
         Args:
@@ -330,6 +330,7 @@ class MPC:
         # Add the terminal constraint if requires
         # Hint: If you are unsure, you can start testing without this first!
         if terminal_idx < self.no_samples:
+            '''
             for k in range(terminal_idx, self.no_samples):
                 prog.AddLinearConstraint(
                     state[k, 0] == ZMP_ref_k[terminal_idx, 0])
@@ -337,6 +338,23 @@ class MPC:
                 prog.AddLinearConstraint(
                     state[k, 2] == ZMP_ref_k[terminal_idx, 1])
                 prog.AddLinearConstraint(state[k, 3] == 0.0)
+            '''
+            # Use terminal soft constraints instead of terminal hard constraints to prevent overshooting
+            terminal_weight_pos = 0.005
+            terminal_weight_vel = 0.001
+
+            terminal_state_ref = np.array([
+                ZMP_ref_k[-1, 0],
+                0.0,
+                ZMP_ref_k[-1, 1],
+                0.0
+            ])
+            # Diagonal weight matrix for terminal cost
+            W_terminal = np.diag([terminal_weight_pos, terminal_weight_vel,
+                                  terminal_weight_pos, terminal_weight_vel])
+            # Terminal cost
+            prog.AddQuadraticErrorCost(
+                W_terminal, terminal_state_ref, state[-1])
 
         # setup our cost: minimize zmp error (tracking), minimize CoM velocity (smoothing)
         # add the cost at each timestep, hint: prog.AddCost
