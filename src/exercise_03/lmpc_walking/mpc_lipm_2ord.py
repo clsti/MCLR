@@ -454,14 +454,12 @@ for i in range(NO_SIM_SAMPLES):
     # simulate a push for 0.05 sec with 1.0 m/s^2 acceleration
     x_ddot_ext = np.array([0, 0])
 
-    # >>>>TODO: when you got everything working try adding a small disturbance
-    # if i > int(t_push/T_SIM) and i < int((t_push + 0.05)/T_SIM):
-    #    x_ddot_ext = np.array([0.0, 1.0])
+    # adding a small disturbance
+    if i > int(t_push/T_SIM) and i < int((t_push + 0.05)/T_SIM):
+        x_ddot_ext = np.array([0.0, 1.0])
 
     # Update the simulation using the current command
     x_k = sim.simulate(u_k, x_ddot_ext)
-
-    print(u_k)
 
     # save some stuff
     TIME_VEC[i] = t
@@ -531,6 +529,20 @@ axs[2, 1].set_xlabel("Time [s]")
 axs[2, 1].legend()
 axs[2, 1].grid(True)
 
+
+# Define the push interval
+start_t = t_push
+end_t = t_push + 0.05
+
+# Add vertical span (highlight) to CoM & ZMP plots
+axs[0, 0].axvspan(start_t, end_t, color='yellow',
+                  alpha=0.5, label='Disturbance')
+handles, labels = axs[0, 0].get_legend_handles_labels()
+axs[0, 0].legend(handles, labels)
+axs[0, 1].axvspan(start_t, end_t, color='yellow',
+                  alpha=0.5, label='Disturbance')
+handles, labels = axs[1, 1].get_legend_handles_labels()
+axs[1, 1].legend(handles, labels)
 
 # XY-footstep plot
 fig, ax = plt.subplots(figsize=(10, 8))
