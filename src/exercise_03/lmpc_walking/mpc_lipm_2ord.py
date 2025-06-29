@@ -347,9 +347,6 @@ class MPC:
                 control[k]                 # Control variable at timestep k
             )
 
-            prog.AddCost(alpha * (ZMP_ref_k[k, 0] - control[k, 0])**2.0)
-            prog.AddCost(alpha * (ZMP_ref_k[k, 1] - control[k, 1])**2.0)
-
             vx = state[k, 1]
             vy = state[k, 3]
 
