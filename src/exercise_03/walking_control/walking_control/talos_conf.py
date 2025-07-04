@@ -1,14 +1,13 @@
 import os
 import pinocchio as pin
 import numpy as np
-import rospkg
+from ament_index_python.packages import get_package_share_directory
 
 ################################################################################
 # robot
 ################################################################################
 
-rospack = rospkg.RosPack()
-talos_description = rospack.get_path('talos_description')
+talos_description = get_package_share_directory('talos_description')
 urdf = os.path.join(talos_description, "robots/talos_reduced_no_hands.urdf")
 path = os.path.join(talos_description, "meshes/../..")
 
@@ -18,9 +17,11 @@ na = 30                                         # number of actuated
 
 # homing pose
 q_actuated_home = np.zeros(na)
-q_actuated_home[:6] = np.array([0.0004217227847487237, -0.00457389353360238, -0.44288825380502317, 0.9014217614029372, -0.4586176441428318, 0.00413219379047014])
-q_actuated_home[6:12] = np.array([-0.0004612402198835852, -0.0031162522884748967, -0.4426315354712109, 0.9014369887125069, -0.4588832011407824, 0.003546732694320376])
-q_home = np.hstack([np.array([0, 0, 0.9, 0, 0, 0, 1]), q_actuated_home])
+q_actuated_home[:6] = np.array([0.0004217227847487237, -0.00457389353360238, -
+                               0.44288825380502317, 0.9014217614029372, -0.4586176441428318, 0.00413219379047014])
+q_actuated_home[6:12] = np.array([-0.0004612402198835852, -0.0031162522884748967, -
+                                 0.4426315354712109, 0.9014369887125069, -0.4588832011407824, 0.003546732694320376])
+q_home = np.hstack([np.array([0, 0, 1.1, 0, 0, 0, 1]), q_actuated_home])
 
 '''
 0, 1, 2, 3, 4, 5, 			    # left leg
@@ -40,12 +41,16 @@ lfxp = foot_scaling*0.12                # foot length in positive x direction
 lfxn = foot_scaling*0.08                # foot length in negative x direction
 lfyp = foot_scaling*0.065               # foot length in positive y direction
 lfyn = foot_scaling*0.065               # foot length in negative y direction
+# TODO: lfxp and lfxn seem to be mixed
+lfxp = foot_scaling*0.08
+lfxn = foot_scaling*0.12
 
 lz = 0.                                 # foot sole height with respect to ankle joint
 f_mu = 0.3                              # friction coefficient
 f_fMin = 5.0                            # minimum normal force
 f_fMax = 1e6                            # maximum normal force
-contactNormal = np.array([0., 0., 1.])  # direction of the normal to the contact surface
+# direction of the normal to the contact surface
+contactNormal = np.array([0., 0., 1.])
 
 ################################################################################
 # foot print
@@ -69,10 +74,12 @@ w_am = 1e-4             # weight of angular momentum task
 w_foot = 1e-1           # weight of the foot motion task: here no motion
 w_hand = 1e-1           # weight of the hand motion task
 w_torso = 1             # weight torso orientation motion task
-w_feet_contact = 1e5    # weight of foot in contact (negative means infinite weight)
+# weight of foot in contact (negative means infinite weight)
+w_feet_contact = 1e5
 w_hand_contact = 1e5    # weight for hand in contact
 w_posture = 1e-3        # weight of joint posture task
-w_force_reg = 1e-5      # weight of force regularization task (note this is really important!)
+# weight of force regularization task (note this is really important!)
+w_force_reg = 1e-5
 w_torque_bounds = 1.0   # weight of the torque bounds: here no bounds
 w_joint_bounds = 0.0    # weight of the velocity bounds: here no bounds
 
@@ -86,12 +93,14 @@ kp_am = 10.0            # proportional gain of angular momentum task
 
 # proportional gain of joint posture task
 kp_posture = np.array([
-        10., 10., 10., 10., 10., 10.,           # left leg  #low gain on axis along y and knee
-        10., 10., 10., 10., 10., 10.,           # right leg #low gain on axis along y and knee
-        5000., 5000.,                           # torso really high to make them stiff
-        10., 10., 10., 10., 10., 10., 10., 10., # right arm make the x direction soft
-        10., 10., 10., 10., 10., 10., 10., 10., # left arm make the x direction soft
-        1000., 1000.                            # head
+    # left leg  #low gain on axis along y and knee
+    10., 10., 10., 10., 10., 10.,
+    # right leg #low gain on axis along y and knee
+    10., 10., 10., 10., 10., 10.,
+    5000., 5000.,                           # torso really high to make them stiff
+    10., 10., 10., 10., 10., 10., 10.,      # right arm make the x direction soft
+    10., 10., 10., 10., 10., 10., 10.,      # left arm make the x direction soft
+    1000., 1000.                            # head
 ])
 masks_posture = np.ones(na)                     # mask out joint (here none)
 
@@ -111,8 +120,9 @@ g = 9.81                        # gravity magnitude
 h = 0.85                        # walking height
 
 # mpc settings
-dt_mpc = 0.1                                            # sampling time interval for the mpc
-step_dur = 0.8                                          # time per step 
+# sampling time interval for the mpc
+dt_mpc = 0.1
+step_dur = 0.8                                          # time per step
 no_mpc_samples_per_step = int(round(step_dur/dt_mpc))   # number of mpc updates
 
 # mpc horizon settings
@@ -121,9 +131,10 @@ horizion_dur = no_steps_per_horizon*step_dur
 no_mpc_samples_per_horizon = int(round(horizion_dur/dt_mpc))
 
 # mpc cost settings
-alpha       = 10**(-1)          # ZMP error squared cost weight
-gamma       = 10**(-3)          # VEL smoothing cost
+alpha = 10**(-1)          # ZMP error squared cost weight
+gamma = 10**(-3)          # VEL smoothing cost
 
-no_sim_per_mpc = int(round(dt_mpc / dt))        # number of sim between mpc update
-no_sim_per_step = int(round(step_dur / dt))     # number of sim between foot steps
-
+# number of sim between mpc update
+no_sim_per_mpc = int(round(dt_mpc / dt))
+# number of sim between foot steps
+no_sim_per_step = int(round(step_dur / dt))

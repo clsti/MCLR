@@ -20,6 +20,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            'talos = walking_control.talos:main',
+            'walking = walking_control.walking:main',
         ],
     },
 )
