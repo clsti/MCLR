@@ -46,18 +46,22 @@ def main(args=None):
 
     # inital footsteps
     # Set intial swing foot pose to left foot
-    T_swing_w = robot.stack.get_placement_LF()
+    T_swing_w = robot.swingFootPose()
     # Set intial support foot pose to right foot
-    T_support_w = robot.stack.get_placement_RF()
+    T_support_w = robot.supportFootPose()
+
+    print(f"T_swing_w: {T_swing_w}")
+    print(f"T_support_w: {T_support_w}")
 
     # initial footsteps for logging
-    LF_pos_ref = T_swing_w.translation
-    RF_pos_ref = T_support_w.translation
+    LF_pose_ref = T_swing_w
+    RF_pose_ref = T_support_w
 
     # setup the plan with 20 steps
     no_steps = 20
     planner = FootStepPlanner(conf)  # Create the planner
-    plan = planner.planLine(T_swing_w, Side.LEFT, no_steps)  # Create the plan
+    plan = planner.planLine(T_swing_w, Side.LEFT,
+                            no_steps + 2)  # Create the plan
     # Append the two last steps once more to the plan so our mpc horizon will never run out
     plan.append(plan[-1])
     plan.append(plan[-1])
@@ -67,9 +71,6 @@ def main(args=None):
         plan, conf.no_mpc_samples_per_step)  # Generate the mpc reference
     # Plot the plan (make sure this workes first)
     planner.plot(sim)
-    for zmp in ZMP_ref:
-        pos = [zmp[0], zmp[1], 0.01]
-        sim.addSphereMarker(pos)
 
     # setup the lip models
     mpc = LIPMPC(conf)  # Setup mpc
@@ -150,7 +151,8 @@ def main(args=None):
     # logging
     ############################################################################
 
-    k = 0                                               # current MPC index
+    # current MPC index
+    k = conf.no_mpc_samples_per_step
     # current index of the step within foot step plan
     plan_idx = 1
     # elapsed time within current step (use to evaluate spline)
@@ -216,13 +218,13 @@ def main(args=None):
             traj_pos, traj_vel, traj_acc = foot_traj.evaluate(t_step_elapsed)
             robot.updateSwingFootRef(traj_pos, traj_vel, traj_acc)
             if step_next.side == Side.LEFT:
-                LF_pos_ref = traj_pos.translation
+                LF_pose_ref = traj_pos
                 LF_vel_ref = traj_vel
                 LF_acc_ref = traj_acc
                 RF_vel_ref = np.array([0.0, 0.0, 0.0])
                 RF_acc_ref = np.array([0.0, 0.0, 0.0])
             else:
-                RF_pos_ref = traj_pos.translation
+                RF_pose_ref = traj_pos
                 RF_vel_ref = traj_vel
                 RF_acc_ref = traj_acc
                 LF_vel_ref = np.array([0.0, 0.0, 0.0])
@@ -278,10 +280,10 @@ def main(args=None):
 
             ANGULAR_MOMENTUM[i, :] = robot.stack.get_angular_momentum()
 
-            LEFT_FOOT_POS_ref[i, :] = LF_pos_ref
+            LEFT_FOOT_POS_ref[i, :] = LF_pose_ref.translation
             LEFT_FOOT_VEL_ref[i, :] = LF_vel_ref
             LEFT_FOOT_ACC_ref[i, :] = LF_acc_ref
-            RIGHT_FOOT_POS_ref[i, :] = RF_pos_ref
+            RIGHT_FOOT_POS_ref[i, :] = RF_pose_ref.translation
             RIGHT_FOOT_VEL_ref[i, :] = RF_vel_ref
             RIGHT_FOOT_ACC_ref[i, :] = RF_acc_ref
             LF_3d_pos, LF_3d_vel, LF_3d_acc = robot.stack.get_LF_3d_pos_vel_acc(
@@ -406,5 +408,4 @@ def main(args=None):
 
 
 if __name__ == '__main__':
-    rclpy.init()
     main()

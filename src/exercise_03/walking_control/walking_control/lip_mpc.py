@@ -89,7 +89,7 @@ class LIPInterpolator:
         # Return the center of mass state
         # that is position \in R3, velocity \in R3, acceleration \in R3
         c = np.array([self.x[0], self.x[2], self.h])
-        c_dot = np.array([self.x_dot[0], self.x_dot[2], 0.0])
+        c_dot = np.array([self.x[1], self.x[3], 0.0])
         c_ddot = np.array([self.x_dot[1], self.x_dot[3], 0.0])
         return c, c_dot, c_ddot
 
@@ -108,7 +108,7 @@ class LIPInterpolator:
         # Return the zmp
         c, _, c_ddot = self.comState()
         zmp_x = c[0] - c_ddot[0] / self.g_h
-        zmp_y = c[2] - c_ddot[2] / self.g_h
+        zmp_y = c[1] - c_ddot[1] / self.g_h
         return np.array([zmp_x, zmp_y, 0.0])
 
 
