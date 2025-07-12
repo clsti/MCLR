@@ -20,6 +20,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            'lip_mpc = walking_control.lip_mpc:main',
             'talos = walking_control.talos:main',
             'walking = walking_control.walking:main',
         ],

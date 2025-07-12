@@ -271,3 +271,132 @@ def generate_zmp_reference(foot_steps, no_samples_per_step):
     zmp_ref = np.vstack(zmp_ref_list)
 
     return zmp_ref
+
+
+def main(args=None):
+    from simulator.pybullet_wrapper import PybulletWrapper
+    from walking_control.talos import Talos
+    from walking_control.footstep_planner import FootStepPlanner
+    from walking_control.footstep_planner import Side
+    import walking_control.talos_conf as conf
+    import rclpy
+    import pinocchio as pin
+
+    rclpy.init(args=args)
+
+    sim = PybulletWrapper()
+
+    robot = Talos(sim)
+
+    # inital footsteps
+    # Set intial swing foot pose to left foot
+    T_swing_w = robot.swingFootPose()
+    # Set intial support foot pose to right foot
+    T_support_w = robot.supportFootPose()
+
+    no_steps = 20
+    planner = FootStepPlanner(conf)  # Create the planner
+    plan = planner.planLine(T_swing_w, Side.LEFT,
+                            no_steps + 2)  # Create the plan
+    # Append the two last steps once more to the plan so our mpc horizon will never run out
+    plan.append(plan[-1])
+    plan.append(plan[-1])
+    planner.plot(sim)
+
+    # generate reference
+    ZMP_ref = generate_zmp_reference(
+        plan, conf.no_mpc_samples_per_step)
+
+    # setup the lip models
+    mpc = LIPMPC(conf)  # Setup mpc
+
+    # Assume the com is over the first support foot
+    # Build the intial mpc state vector
+    x0 = np.array([
+        T_support_w.translation[0],
+        0.0,
+        T_support_w.translation[1],
+        0.0
+    ])
+
+    # Create the interpolator and set the inital state
+    interpolator = LIPInterpolator(x0, conf)
+
+    # set the com task reference to the inital support foot
+    com_rf = np.array(
+        [T_support_w.translation[0], T_support_w.translation[1], conf.h])
+    # Set the COM reference to be over supporting foot
+    robot.stack.setComRefState(com_rf)
+
+    pre_dur = 3.0   # Time to wait before walking should start
+
+    # Compute number of iterations:
+    N_pre = int(pre_dur/conf.dt)  # Number of sim steps before walking starts
+    # Total number of sim steps during walking
+    N_sim = no_steps * conf.no_sim_per_step
+
+    # current MPC index
+    k = 1 * conf.no_mpc_samples_per_step
+
+    for i in range(-N_pre, N_sim):
+        t = sim.simTime()  # Simulator time
+        dt = sim.stepTime()  # Simulator dt
+
+        ########################################################################
+        # update the mpc very no_sim_per_mpc steps
+        ########################################################################
+
+        if i >= 0 and i % conf.no_sim_per_mpc == 0:
+            # MPC update
+            # Get current LIP state
+            c = interpolator.x
+            sim.addSphereMarker(
+                np.array([c[0], c[2], 0.0]), radius=0.01, color=[0, 1, 0, 1])
+            # Extract the ZMP reference
+            ZMP_ref_k = ZMP_ref[k: k + conf.no_mpc_samples_per_horizon]
+            sim.addSphereMarker(
+                np.array([ZMP_ref_k[0][0], ZMP_ref_k[0][1], 0.0]), radius=0.01, color=[1, 0, 0, 1])
+            # get terminal index
+            idx_terminal_k = (no_steps - 1) * conf.no_mpc_samples_per_step - k
+            # Solve mpc
+            # u_k seems to be always correct & within footplan
+            u_k = mpc.buildSolveOCP(c, ZMP_ref_k, idx_terminal_k)
+            # print(f"x_dif: {interpolator.x[0] - u_k[0]}")
+            # print(f"y_dif: {interpolator.x[2] - u_k[1]}")
+            sim.addSphereMarker(
+                np.array([u_k[0], u_k[1], 0.0]), radius=0.01, color=[0, 0, 1, 1])
+            k += 1
+
+        ########################################################################
+        # in every iteration when walking
+        ########################################################################
+
+        if i >= 0:
+            # Update the interpolator with the latest command u_k
+            x_k = interpolator.integrate(u_k)
+
+            # Feed the com tasks with the new com reference
+            # com_pos, com_vel, com_acc = interpolator.comState()
+
+        ########################################################################
+        # update the simulation
+        ########################################################################
+
+        # Update the simulator and the robot
+        sim.step()
+        sim.debug()
+        robot.update()
+
+    try:
+        while rclpy.ok():
+            rclpy.spin_once(robot, timeout_sec=0)
+            sim.step()
+            robot.update()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        rclpy.shutdown()
+
+
+if __name__ == '__main__':
+    main()

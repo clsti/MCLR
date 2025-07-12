@@ -170,12 +170,18 @@ def main(args=None):
             # MPC update
             # Get current LIP state
             c = interpolator.x
+            sim.addSphereMarker(
+                np.array([c[0], c[2], 0.0]), radius=0.01, color=[0, 1, 0, 1])
             # Extract the ZMP reference
             ZMP_ref_k = ZMP_ref[k: k + conf.no_mpc_samples_per_horizon]
+            sim.addSphereMarker(
+                np.array([ZMP_ref_k[0][0], ZMP_ref_k[0][1], 0.0]), radius=0.01, color=[1, 1, 0, 1])
             # get terminal index
             idx_terminal_k = (no_steps - 1) * conf.no_mpc_samples_per_step - k
             # Solve mpc
             u_k = mpc.buildSolveOCP(c, ZMP_ref_k, idx_terminal_k)
+            sim.addSphereMarker(
+                np.array([u_k[0], u_k[1], 0.0]), radius=0.01, color=[0, 0, 1, 1])
             k += 1
 
         ########################################################################
@@ -184,24 +190,38 @@ def main(args=None):
 
         if i >= 0 and i % conf.no_sim_per_step == 0:
             # Start next step
+            print("Starting next step...")
             # Get next step location for swing foot
             step_next = plan[plan_idx + 1]
             sw_foot_loc_next = step_next.poseInWorld()
-
+            print("Next swing foot location: ", sw_foot_loc_next)
             # Set the swing foot of the robot
             robot.setSwingFoot(step_next.side)
-
+            print("Set swing foot to: ", step_next.side)
             # Set the support foot for the robot
             support_foot = Side.LEFT if step_next.side == Side.RIGHT else Side.RIGHT
             robot.setSupportFoot(support_foot)
-
+            print("Set support foot to: ", support_foot)
             # Get the current location of the swing foot
             sw_foot_loc_curr = robot.swingFootPose()
-
+            print("Current swing foot location: ", sw_foot_loc_curr)
             # Plan a foot trajectory between current and next foot pose
             foot_traj = SwingFootTrajectory(
                 sw_foot_loc_curr, sw_foot_loc_next, conf.step_dur)
 
+            # Visualize swing foot trajectory in simulation
+            N = int(conf.step_dur / conf.dt_mpc) + 1
+            for i in range(N):
+                t = i * conf.dt_mpc
+                pose, _, _ = foot_traj.evaluate(t)
+                # Add a small sphere marker at each position
+                sim.addSphereMarker(
+                    np.array(
+                        [pose.translation[0], pose.translation[1], pose.translation[2]]),
+                    radius=0.01,
+                    color=[1, 0, 1, 1]  # magenta for visibility
+                )
+            print("Foot trajectory planned")
             t_step_elapsed = 0.0
             plan_idx += 1
 
@@ -214,6 +234,9 @@ def main(args=None):
             t_step_elapsed += dt
             # Update foot trajectory with current step time
             traj_pos, traj_vel, traj_acc = foot_traj.evaluate(t_step_elapsed)
+            print("Current step time: ", t_step_elapsed)
+            print("Foot trajectory position: ", traj_pos)
+            print("Actual swing foot pose:", robot.swingFootPose().translation)
             robot.updateSwingFootRef(traj_pos, traj_vel, traj_acc)
             if step_next.side == Side.LEFT:
                 LF_pose_ref = traj_pos
@@ -221,12 +244,16 @@ def main(args=None):
                 LF_acc_ref = traj_acc
                 RF_vel_ref = np.array([0.0, 0.0, 0.0])
                 RF_acc_ref = np.array([0.0, 0.0, 0.0])
+                # robot.stack.set_RF_pose_ref(
+                #     RF_pose_ref, RF_vel_ref, RF_acc_ref)
             else:
                 RF_pose_ref = traj_pos
                 RF_vel_ref = traj_vel
                 RF_acc_ref = traj_acc
                 LF_vel_ref = np.array([0.0, 0.0, 0.0])
                 LF_acc_ref = np.array([0.0, 0.0, 0.0])
+                # robot.stack.set_LF_pose_ref(
+                #     LF_pose_ref, LF_vel_ref, LF_acc_ref)
 
             # Update the interpolator with the latest command u_k
             interpolator.integrate(u_k)
@@ -234,9 +261,6 @@ def main(args=None):
             # Feed the com tasks with the new com reference
             com_pos, com_vel, com_acc = interpolator.comState()
             robot.stack.setComRefState(com_pos, com_vel, com_acc)
-
-            # Increment elapsed footstep time
-            t_step_elapsed += dt
 
         ########################################################################
         # update the simulation

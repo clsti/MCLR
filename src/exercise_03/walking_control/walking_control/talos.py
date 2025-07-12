@@ -331,6 +331,9 @@ class Talos(Node):
         q = self.robot.q()
         v = self.robot.v()
 
+        print("active contact left:", self.stack.contact_LF_active)
+        print("active contact right:", self.stack.contact_RF_active)
+
         # Solve the whole body qp
         self.tau, self.dv = self.stack.update(q, v, t)
         # Command the torque to pybullet robot
