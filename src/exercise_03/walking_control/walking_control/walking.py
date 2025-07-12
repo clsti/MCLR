@@ -50,9 +50,6 @@ def main(args=None):
     # Set intial support foot pose to right foot
     T_support_w = robot.supportFootPose()
 
-    print(f"T_swing_w: {T_swing_w}")
-    print(f"T_support_w: {T_support_w}")
-
     # initial footsteps for logging
     LF_pose_ref = T_swing_w
     RF_pose_ref = T_support_w
@@ -83,14 +80,15 @@ def main(args=None):
         T_support_w.translation[1],
         0.0
     ])
+
     # Create the interpolator and set the inital state
     interpolator = LIPInterpolator(x0, conf)
 
     # set the com task reference to the inital support foot
-    com_rf = np.array(
+    com_init = np.array(
         [T_support_w.translation[0], T_support_w.translation[1], conf.h])
     # Set the COM reference to be over supporting foot
-    robot.stack.setComRefState(com_rf)
+    robot.stack.setComRefState(com_init)
 
     ############################################################################
     # logging
@@ -152,7 +150,7 @@ def main(args=None):
     ############################################################################
 
     # current MPC index
-    k = conf.no_mpc_samples_per_step
+    k = 1 * conf.no_mpc_samples_per_step
     # current index of the step within foot step plan
     plan_idx = 1
     # elapsed time within current step (use to evaluate spline)
@@ -186,11 +184,6 @@ def main(args=None):
 
         if i >= 0 and i % conf.no_sim_per_step == 0:
             # Start next step
-
-            # Get the current location of the swing foot
-            step_curr = plan[plan_idx - 1]
-            sw_foot_loc_curr = step_curr.poseInWorld()
-
             # Get next step location for swing foot
             step_next = plan[plan_idx + 1]
             sw_foot_loc_next = step_next.poseInWorld()
@@ -201,6 +194,9 @@ def main(args=None):
             # Set the support foot for the robot
             support_foot = Side.LEFT if step_next.side == Side.RIGHT else Side.RIGHT
             robot.setSupportFoot(support_foot)
+
+            # Get the current location of the swing foot
+            sw_foot_loc_curr = robot.swingFootPose()
 
             # Plan a foot trajectory between current and next foot pose
             foot_traj = SwingFootTrajectory(
@@ -214,6 +210,8 @@ def main(args=None):
         ########################################################################
 
         if i >= 0:
+            # Increment elapsed footstep time
+            t_step_elapsed += dt
             # Update foot trajectory with current step time
             traj_pos, traj_vel, traj_acc = foot_traj.evaluate(t_step_elapsed)
             robot.updateSwingFootRef(traj_pos, traj_vel, traj_acc)

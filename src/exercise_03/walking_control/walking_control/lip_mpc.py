@@ -119,7 +119,7 @@ class LIPInterpolator:
 class LIPMPC:
     def __init__(self, conf):
         self.conf = conf
-        self.dt = conf.dt
+        self.dt = conf.dt_mpc
         self.no_samples = conf.no_mpc_samples_per_horizon
         self.g = conf.g
         self.h = conf.h
@@ -262,8 +262,9 @@ def generate_zmp_reference(foot_steps, no_samples_per_step):
 
     for foot in foot_steps:
         pose = foot.poseInWorld()
-        x = pose.translation[0]
-        y = pose.translation[1]
+        center_offset = np.mean(foot.footprint, axis=1)
+        x = pose.translation[0] + center_offset[0]
+        y = pose.translation[1] + center_offset[1]
         zmp_step = np.tile([x, y], (no_samples_per_step, 1))
         zmp_ref_list.append(zmp_step)
 
