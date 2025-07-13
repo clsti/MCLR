@@ -25,7 +25,7 @@ class Go2(Node):
             conf.urdf,
             self.model,
             q=conf.q_stable,
-            basePosition=np.array([0, 0, 0.47]),
+            basePosition=np.array([0, 0, 0.36]),
             baseQuationerion=np.array([0, 0, 0, 1]),
             useFixedBase=False
         )

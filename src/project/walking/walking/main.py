@@ -15,7 +15,6 @@ def main(args=None):
     while rclpy.ok():
         sim.step()
         sim.debug()
-        print(robot.robot.baseCoMOrientation())
 
 
 if __name__ == '__main__':

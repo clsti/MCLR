@@ -11,17 +11,20 @@ urdf = os.path.join(talos_description, "urdf/go2_description.urdf")
 path = os.path.join(talos_description, "meshes/../..")
 
 
+knee = -1.5
+hipPitch = 1.57 / 2.0 - 0.2
+hipRoll = 0.0
+
 q_stable = np.array([
     # ───────────── floating base ─────────────
-    # x, y, z  (≈ 31 cm height – tweak ±2 cm if the feet hover or sink)
-    0.00, 0.00, 0.47,
+    0.00, 0.00, 0.36,
     0.00, 0.00, 0.00, 1.00,  # qx, qy, qz, qw  (identity orientation)
-    # ───── front‑right (FR) leg ─────
-    0.00,   0.00,   0.00,    # hipRoll, hipPitch, knee
-    # ───── front‑left (FL)  leg ─────
-    0.00,   0.00,   0.00,
-    # ───── rear‑right (RR)  leg ─────
-    0.00,   0.00,   0.00,
-    # ───── rear‑left (RL)   leg ─────
-    0.00,   0.00,   0.00
+    # ───── front‑left (FL) leg ─────
+    hipRoll,   hipPitch,   knee,    # hipRoll, hipPitch, knee
+    # ───── front‑right (FR)  leg ─────
+    hipRoll,   hipPitch,   knee,
+    # ───── rear‑left (RL)  leg ─────
+    hipRoll,   hipPitch,   knee,
+    # ───── rear‑right (RR)   leg ─────
+    hipRoll,   hipPitch,   knee
 ])
