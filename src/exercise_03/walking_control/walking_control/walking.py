@@ -194,20 +194,28 @@ def main(args=None):
             # Get next step location for swing foot
             step_next = plan[plan_idx + 1]
             sw_foot_loc_next = step_next.poseInWorld()
-            print("Next swing foot location: ", sw_foot_loc_next)
+
+            # TODO: Set z to correction value; try to prevent foot rotation
+            sw_foot_loc_next.translation[2] = -0.017
+
             # Set the swing foot of the robot
             robot.setSwingFoot(step_next.side)
-            print("Set swing foot to: ", step_next.side)
+
             # Set the support foot for the robot
             support_foot = Side.LEFT if step_next.side == Side.RIGHT else Side.RIGHT
             robot.setSupportFoot(support_foot)
-            print("Set support foot to: ", support_foot)
+
             # Get the current location of the swing foot
             sw_foot_loc_curr = robot.swingFootPose()
-            print("Current swing foot location: ", sw_foot_loc_curr)
+
+            # Get the current location of the swing foot
+            sw_foot_loc_curr = robot.swingFootPose()
+
             # Plan a foot trajectory between current and next foot pose
             foot_traj = SwingFootTrajectory(
                 sw_foot_loc_curr, sw_foot_loc_next, conf.step_dur)
+
+            print("Actual swing foot pose:", robot.swingFootPose().translation)
 
             # Visualize swing foot trajectory in simulation
             N = int(conf.step_dur / conf.dt_mpc) + 1
@@ -221,7 +229,6 @@ def main(args=None):
                     radius=0.01,
                     color=[1, 0, 1, 1]  # magenta for visibility
                 )
-            print("Foot trajectory planned")
             t_step_elapsed = 0.0
             plan_idx += 1
 
@@ -234,17 +241,17 @@ def main(args=None):
             t_step_elapsed += dt
             # Update foot trajectory with current step time
             traj_pos, traj_vel, traj_acc = foot_traj.evaluate(t_step_elapsed)
-            print("Current step time: ", t_step_elapsed)
-            print("Foot trajectory position: ", traj_pos)
-            print("Actual swing foot pose:", robot.swingFootPose().translation)
             robot.updateSwingFootRef(traj_pos, traj_vel, traj_acc)
+            if t_step_elapsed >= conf.step_dur:
+                # traj_pos.translation[2] = 0.0
+                robot.updateSwingFootRef(traj_pos, np.zeros(3), np.zeros(3))
             if step_next.side == Side.LEFT:
                 LF_pose_ref = traj_pos
                 LF_vel_ref = traj_vel
                 LF_acc_ref = traj_acc
                 RF_vel_ref = np.array([0.0, 0.0, 0.0])
                 RF_acc_ref = np.array([0.0, 0.0, 0.0])
-                # robot.stack.set_RF_pose_ref(
+                # robot.stack.set_LF_pose_ref(
                 #     RF_pose_ref, RF_vel_ref, RF_acc_ref)
             else:
                 RF_pose_ref = traj_pos
@@ -297,7 +304,7 @@ def main(args=None):
                         ) / (self.plot_time[-1] - self.plot_time[-3])
             else:
                 gt_acc = np.zeros_like(gt_vel)
-            COM_ACC_pb[i, :] = 
+            COM_ACC_pb[i, :] =
             '''
 
             ANGULAR_MOMENTUM[i, :] = robot.stack.get_angular_momentum()
