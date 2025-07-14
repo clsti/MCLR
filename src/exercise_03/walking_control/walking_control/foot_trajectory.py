@@ -228,6 +228,7 @@ class SwingFootTrajectory:
         vel = self.curve.vel(t)
         acc = self.curve.acc(t)
 
+        # Assume constant foot rotation
         # alpha = t / self._duration
         # R = self.R0 @ pin.exp3(pin.log3(self.R0.T @ self.R1) * alpha)
 
