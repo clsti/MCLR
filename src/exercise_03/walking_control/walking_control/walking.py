@@ -170,12 +170,18 @@ def main(args=None):
             # MPC update
             # Get current LIP state
             c = interpolator.x
+            sim.addSphereMarker(
+                np.array([c[0], c[2], 0.0]), radius=0.01, color=[0, 1, 0, 1])
             # Extract the ZMP reference
             ZMP_ref_k = ZMP_ref[k: k + conf.no_mpc_samples_per_horizon]
+            sim.addSphereMarker(
+                np.array([ZMP_ref_k[0][0], ZMP_ref_k[0][1], 0.0]), radius=0.01, color=[1, 1, 0, 1])
             # get terminal index
             idx_terminal_k = (no_steps - 1) * conf.no_mpc_samples_per_step - k
             # Solve mpc
             u_k = mpc.buildSolveOCP(c, ZMP_ref_k, idx_terminal_k)
+            sim.addSphereMarker(
+                np.array([u_k[0], u_k[1], 0.0]), radius=0.01, color=[0, 0, 1, 1])
             k += 1
 
         ########################################################################
@@ -184,9 +190,14 @@ def main(args=None):
 
         if i >= 0 and i % conf.no_sim_per_step == 0:
             # Start next step
+
             # Get next step location for swing foot
             step_next = plan[plan_idx + 1]
             sw_foot_loc_next = step_next.poseInWorld()
+
+            # Try to set z/height to correction value as foot not zero height when changing to support foot
+            # Try to prevent foot rotation -> didn't work
+            # sw_foot_loc_next.translation[2] = -0.017
 
             # Set the swing foot of the robot
             robot.setSwingFoot(step_next.side)
@@ -202,6 +213,20 @@ def main(args=None):
             foot_traj = SwingFootTrajectory(
                 sw_foot_loc_curr, sw_foot_loc_next, conf.step_dur)
 
+            print("Actual swing foot pose:", robot.swingFootPose().translation)
+
+            # Visualize swing foot trajectory in simulation
+            N = int(conf.step_dur / conf.dt_mpc) + 1
+            for i in range(N):
+                t = i * conf.dt_mpc
+                pose, _, _ = foot_traj.evaluate(t)
+                # Add a small sphere marker at each position
+                sim.addSphereMarker(
+                    np.array(
+                        [pose.translation[0], pose.translation[1], pose.translation[2]]),
+                    radius=0.01,
+                    color=[1, 0, 1, 1]  # magenta for visibility
+                )
             t_step_elapsed = 0.0
             plan_idx += 1
 
@@ -215,18 +240,26 @@ def main(args=None):
             # Update foot trajectory with current step time
             traj_pos, traj_vel, traj_acc = foot_traj.evaluate(t_step_elapsed)
             robot.updateSwingFootRef(traj_pos, traj_vel, traj_acc)
+            if t_step_elapsed >= conf.step_dur:
+                pass
+                # traj_pos.translation[2] = 0.0
+                # robot.updateSwingFootRef(traj_pos, np.zeros(3), np.zeros(3))
             if step_next.side == Side.LEFT:
                 LF_pose_ref = traj_pos
                 LF_vel_ref = traj_vel
                 LF_acc_ref = traj_acc
                 RF_vel_ref = np.array([0.0, 0.0, 0.0])
                 RF_acc_ref = np.array([0.0, 0.0, 0.0])
+                # robot.stack.set_LF_pose_ref(
+                #     RF_pose_ref, RF_vel_ref, RF_acc_ref)
             else:
                 RF_pose_ref = traj_pos
                 RF_vel_ref = traj_vel
                 RF_acc_ref = traj_acc
                 LF_vel_ref = np.array([0.0, 0.0, 0.0])
                 LF_acc_ref = np.array([0.0, 0.0, 0.0])
+                # robot.stack.set_LF_pose_ref(
+                #     LF_pose_ref, LF_vel_ref, LF_acc_ref)
 
             # Update the interpolator with the latest command u_k
             interpolator.integrate(u_k)
@@ -254,7 +287,6 @@ def main(args=None):
         if i >= 0:
             TIME[i] = t
             # Log information
-            # TODO: reference from interpolator?
             COM_POS_ref[i, :] = interpolator.comState()[0]
             COM_VEL_ref[i, :] = interpolator.comState()[1]
             COM_ACC_ref[i, :] = interpolator.comState()[2]
@@ -263,15 +295,13 @@ def main(args=None):
             COM_ACC_pin[i, :] = robot.stack.comState().second_derivative()
             COM_POS_pb[i, :] = robot.robot.baseCoMPosition()
             COM_VEL_pb[i, :] = robot.robot.baseCoMVelocity()
-            # TODO: Central difference method to get acceleration
-            '''
+            # Central difference method to get acceleration
             if len(COM_VEL_pb) >= 3:
-                gt_acc = (self.plot_gt_vel[-1] - self.plot_gt_vel[-3]
-                        ) / (self.plot_time[-1] - self.plot_time[-3])
+                gt_acc = (COM_VEL_pb[-1] - COM_VEL_pb[-3]
+                          ) / (COM_VEL_pb[-1] - COM_VEL_pb[-3])
             else:
-                gt_acc = np.zeros_like(gt_vel)
-            COM_ACC_pb[i, :] = 
-            '''
+                gt_acc = np.zeros_like(COM_VEL_pb)
+            COM_ACC_pb[i, :] = gt_acc
 
             ANGULAR_MOMENTUM[i, :] = robot.stack.get_angular_momentum()
 
@@ -298,15 +328,25 @@ def main(args=None):
 
             NORMAL_FORCE_RIGHT_pb[i, :] = robot._get_ankle_wrenches()[0].linear
             NORMAL_FORCE_LEFT_pb[i, :] = robot._get_ankle_wrenches()[1].linear
-            '''
+
+            # function to extract total force from wrench
+            def extract_total_xyz_force(wrench):
+                total_force = np.zeros(3)
+                n_pts = len(wrench) // 6
+                for i in range(n_pts):
+                    start = i * 6
+                    total_force += wrench[start: start + 3]
+                return total_force
+
             NORMAL_FORCE_RIGHT_pin[i, :] = robot.stack.get_RF_normal_force(
-                robot.dv)
+                robot.stack.sol)
+            wrench_RF = robot.stack.get_RF_wrench(robot.stack.sol)
+            NORMAL_FORCE_RIGHT_pin[i, :] = extract_total_xyz_force(wrench_RF)
+
             NORMAL_FORCE_LEFT_pin[i, :] = robot.stack.get_LF_normal_force(
-                robot.dv)
-            '''
-            # TODO
-            # NORMAL_FORCE_RIGHT_pin[i, :] = robot.stack.get_RF_wrench(robot.dv)
-            # NORMAL_FORCE_LEFT_pin[i, :] = robot.stack.get_LF_wrench(robot.dv)
+                robot.stack.sol)
+            wrench_LF = robot.stack.get_LF_wrench(robot.stack.sol)
+            NORMAL_FORCE_LEFT_pin[i, :] = extract_total_xyz_force(wrench_LF)
 
     ########################################################################
     # enough with the simulation, lets plot
@@ -316,17 +356,31 @@ def main(args=None):
     plt.style.use('seaborn-dark')
 
     # Plot everything
-    def plot_3x3(data_refs, labels, title_prefix):
+    def plot_3x3(data_refs, labels=None, title_prefix="", column_labels=None, series_labels=None):
         fig, axes = plt.subplots(3, 3, figsize=(15, 10))
         components = ['x', 'y', 'z']
         types = ['Position', 'Velocity', 'Acceleration']
+
         for row in range(3):
             for col in range(3):
                 ax = axes[row, col]
-                for data, label in zip(data_refs[col], labels):
-                    ax.plot(TIME, data[:, row], label=label)
+                try:
+                    series_list = data_refs[col]
+                    for i, data in enumerate(series_list):
+                        if series_labels:
+                            label = series_labels[col][i]
+                        elif labels:
+                            label = labels[i]
+                        else:
+                            label = f"Series {i}"
+                        ax.plot(TIME, data[:, row], label=label)
+                except IndexError:
+                    continue  # Handle incomplete rows or missing data
                 ax.set_ylabel(components[row])
-                ax.set_title(f"{title_prefix} {types[col]}")
+                title = f"{title_prefix} {types[col]}"
+                if column_labels and col < len(column_labels):
+                    title = f"{title_prefix} {column_labels[col]}"
+                ax.set_title(title)
                 ax.legend()
         plt.tight_layout()
 
@@ -347,7 +401,7 @@ def main(args=None):
         data_refs=[
             [COM_POS_ref, COM_POS_pin, COM_POS_pb],
             [COM_VEL_ref, COM_VEL_pin, COM_VEL_pb],
-            [COM_ACC_ref, COM_ACC_pin],  # TODO: COM_ACC_pb
+            [COM_ACC_ref, COM_ACC_pin, COM_ACC_pb]
         ],
         labels=['ref', 'pinocchio', 'pybullet'],
         title_prefix='COM'
@@ -369,7 +423,7 @@ def main(args=None):
 
     # === ZMP, DCM & Angular Momentum ===
     plot_3x3(
-        data_columns=[
+        data_refs=[
             [ZMP_REF, ZMP_EST],
             [DCM],
             [ANGULAR_MOMENTUM],

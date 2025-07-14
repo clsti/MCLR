@@ -84,6 +84,81 @@ class SexticSpline3D:
         return np.array([self._eval_poly_deriv(self.coeffs[dim], t, 2) for dim in range(3)])
 
 
+class CubicSpline3D:
+    """
+    x, y : single cubic from p0 -> p2 over [t0, t2]  (x_dot = 0 at both ends)
+    z    : two cubics
+           - segment-1  p0.z -> p1.z  over [t0, t1]
+           - segment-2  p1.z -> p2.z  over [t1, t2]
+             (x_dot = 0 at t0, t1, t2)
+    """
+
+    def __init__(self, t0, t1, t2, p0, p1, p2, *unused):
+        self.t0, self.t1, self.t2 = float(t0), float(t1), float(t2)
+        self.T = self.t2 - self.t0
+        self.T_seg1 = self.t1 - self.t0
+        self.T_seg2 = self.t2 - self.t1
+
+        # function to get cubic parameters
+        def coeffs(x0, x1, T):
+            a = x0
+            b = np.zeros_like(x0)
+            c = 3.0 * (x1 - x0) / T**2
+            d = 2.0 * (x0 - x1) / T**3
+            return np.vstack([a, b, c, d]).T   # (n,4)
+
+        # x,y coefficients (shared for both segments)
+        self.coeffs_xy = coeffs(p0[:2], p2[:2], self.T)   # (2,4)
+
+        # z coefficients
+        self.coeffs_z1 = coeffs(np.array([p0[2]]), np.array(
+            [p1[2]]), self.T_seg1)  # (1,4)
+        self.coeffs_z2 = coeffs(np.array([p1[2]]), np.array(
+            [p2[2]]), self.T_seg2)  # (1,4)
+
+    @staticmethod
+    def _poly(c, t): return c @ np.array([1, t, t**2,  t**3])
+    @staticmethod
+    def _dpoly(c, t): return c @ np.array([0, 1, 2*t,  3*t**2])
+    @staticmethod
+    def _ddpoly(c, t): return c @ np.array([0, 0, 2,    6*t])
+
+    def _z_coeff_tau(self, t):
+        """Return (coeff_row, t_local) for the z axis."""
+        if t < self.t1:
+            t = np.clip(t - self.t0, 0.0, self.T_seg1)
+            return self.coeffs_z1[0], t
+        t = np.clip(t - self.t1, 0.0, self.T_seg2)
+        return self.coeffs_z2[0], t
+
+    def pos(self, t):
+        t_xy = np.clip(t - self.t0, 0.0, self.T)
+        x = self._poly(self.coeffs_xy[0], t_xy)
+        y = self._poly(self.coeffs_xy[1], t_xy)
+
+        c_z, tz = self._z_coeff_tau(t)
+        z = self._poly(c_z, tz)
+        return np.array([x, y, z])
+
+    def vel(self, t):
+        τ_xy = np.clip(t - self.t0, 0.0, self.T)
+        vx = self._dpoly(self.coeffs_xy[0], τ_xy)
+        vy = self._dpoly(self.coeffs_xy[1], τ_xy)
+
+        c_z, τz = self._z_coeff_tau(t)
+        vz = self._dpoly(c_z, τz)
+        return np.array([vx, vy, vz])
+
+    def acc(self, t):
+        t_xy = np.clip(t - self.t0, 0.0, self.T)
+        ax = self._ddpoly(self.coeffs_xy[0], t_xy)
+        ay = self._ddpoly(self.coeffs_xy[1], t_xy)
+
+        c_z, tz = self._z_coeff_tau(t)
+        az = self._ddpoly(c_z, tz)
+        return np.array([ax, ay, az])
+
+
 class SwingFootTrajectory:
     """SwingFootTrajectory
     Interpolate Foot trajectory between SE3 T0 and T1
@@ -93,10 +168,10 @@ class SwingFootTrajectory:
         """initialize SwingFootTrajectory
 
         Args:
-            T0 (pin.SE3): Inital foot pose
-            T1 (pin.SE3): Final foot pose
-            duration (float): step duration
-            height (float, optional): setp height. Defaults to 0.05.
+            T0(pin.SE3): Inital foot pose
+            T1(pin.SE3): Final foot pose
+            duration(float): step duration
+            height(float, optional): setp height. Defaults to 0.05.
         """
         self._height = height
         self._t_elapsed = 0.0
@@ -121,15 +196,24 @@ class SwingFootTrajectory:
         tmid = self._t_elapsed + 0.5 * self._duration
         zeros = np.zeros(3)
 
-        self.curve = SexticSpline3D(
-            self._t_elapsed, tmid, self._t_end,
-            p0, pmid, p1,
-            zeros, zeros, zeros, zeros
-        )
+        # Use Cubic spline to prevent high velocities that results in infeasible qp solver!
+        Sextic = False
+        if Sextic:
+            self.curve = SexticSpline3D(
+                self._t_elapsed, tmid, self._t_end,
+                p0, pmid, p1,
+                zeros, zeros, zeros, zeros
+            )
+        else:
+            self.curve = CubicSpline3D(
+                self._t_elapsed, tmid, self._t_end,
+                p0, pmid, p1,
+                zeros, zeros, zeros, zeros
+            )
 
         # Interpolate rotations linearly in SO3
-        self.R0 = T0.rotation
-        self.R1 = T1.rotation
+        # self.R0 = T0.rotation
+        # self.R1 = T1.rotation
 
     def isDone(self):
         return self._t_elapsed >= self._duration
@@ -144,8 +228,11 @@ class SwingFootTrajectory:
         vel = self.curve.vel(t)
         acc = self.curve.acc(t)
 
-        alpha = t / self._duration
-        R = self.R0 @ pin.exp3(pin.log3(self.R0.T @ self.R1) * alpha)
+        # Assume constant foot rotation
+        # alpha = t / self._duration
+        # R = self.R0 @ pin.exp3(pin.log3(self.R0.T @ self.R1) * alpha)
+
+        R = np.eye(3)
 
         pose = pin.SE3(R, pos)
         return pose, vel, acc
@@ -153,7 +240,7 @@ class SwingFootTrajectory:
 
 if __name__ == "__main__":
     T0 = pin.SE3(np.eye(3), np.array([0, 0, 0]))
-    T1 = pin.SE3(np.eye(3), np.array([0.5, 0, 0]))
+    T1 = pin.SE3(np.eye(3), np.array([0.25, 0, 0]))
 
     # plot to make sure everything is correct
     duration = 1.0

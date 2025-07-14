@@ -772,11 +772,16 @@ class TSIDWrapper:
     # get forces
     ############################################################################
 
+    def _zeros_like_contact(self, contact):
+        """Return a zero vector matching the force dimension of the given contact."""
+        dim_f = contact.getForceGeneratorMatrix.shape[1]
+        return np.zeros(dim_f)
+
     def get_RF_wrench(self, sol):
         if self.formulation.checkContact(self.contactRF.name, sol):
             return self.formulation.getContactForce(self.contactRF.name, sol)
         else:
-            return np.zeros(6)
+            return self._zeros_like_contact(self.contactRF)
 
     def get_RF_normal_force(self, sol):
         return self.contactRF.getNormalForce(self.get_RF_wrench(sol))
@@ -785,7 +790,7 @@ class TSIDWrapper:
         if self.formulation.checkContact(self.contactLF.name, sol):
             return self.formulation.getContactForce(self.contactLF.name, sol)
         else:
-            return np.zeros(6)
+            return self._zeros_like_contact(self.contactLF)
 
     def get_LF_normal_force(self, sol):
         return self.contactLF.getNormalForce(self.get_LF_wrench(sol))
