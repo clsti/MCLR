@@ -213,8 +213,6 @@ def main(args=None):
             foot_traj = SwingFootTrajectory(
                 sw_foot_loc_curr, sw_foot_loc_next, conf.step_dur)
 
-            print("Actual swing foot pose:", robot.swingFootPose().translation)
-
             # Visualize swing foot trajectory in simulation
             N = int(conf.step_dur / conf.dt_mpc) + 1
             for i in range(N):
@@ -225,7 +223,7 @@ def main(args=None):
                     np.array(
                         [pose.translation[0], pose.translation[1], pose.translation[2]]),
                     radius=0.01,
-                    color=[1, 0, 1, 1]  # magenta for visibility
+                    color=[1, 0, 1, 1]
                 )
             t_step_elapsed = 0.0
             plan_idx += 1
@@ -240,26 +238,18 @@ def main(args=None):
             # Update foot trajectory with current step time
             traj_pos, traj_vel, traj_acc = foot_traj.evaluate(t_step_elapsed)
             robot.updateSwingFootRef(traj_pos, traj_vel, traj_acc)
-            if t_step_elapsed >= conf.step_dur:
-                pass
-                # traj_pos.translation[2] = 0.0
-                # robot.updateSwingFootRef(traj_pos, np.zeros(3), np.zeros(3))
             if step_next.side == Side.LEFT:
                 LF_pose_ref = traj_pos
                 LF_vel_ref = traj_vel
                 LF_acc_ref = traj_acc
                 RF_vel_ref = np.array([0.0, 0.0, 0.0])
                 RF_acc_ref = np.array([0.0, 0.0, 0.0])
-                # robot.stack.set_LF_pose_ref(
-                #     RF_pose_ref, RF_vel_ref, RF_acc_ref)
             else:
                 RF_pose_ref = traj_pos
                 RF_vel_ref = traj_vel
                 RF_acc_ref = traj_acc
                 LF_vel_ref = np.array([0.0, 0.0, 0.0])
                 LF_acc_ref = np.array([0.0, 0.0, 0.0])
-                # robot.stack.set_LF_pose_ref(
-                #     LF_pose_ref, LF_vel_ref, LF_acc_ref)
 
             # Update the interpolator with the latest command u_k
             interpolator.integrate(u_k)
