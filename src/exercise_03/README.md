@@ -71,5 +71,5 @@ ros2 run walking_control talos
 
 ### Task 2: Implement the Walking Cycle
 ```sh
-ros2 run walking_control talos
+ros2 run walking_control walking
 ```
