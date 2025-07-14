@@ -54,6 +54,7 @@ class FootStep:
 
         # Transform to world frame
         R = self.pose.rotation
+        # Assume constant foot orientation
         # center_p = (self.pose.translation + R @ center_offset).tolist()
         center_p = (self.pose.translation + center_offset).tolist()
         quat = pin.Quaternion(R).coeffs()
@@ -139,11 +140,13 @@ class FootStepPlanner:
                 # No forward step for first or last step
                 t = np.array([0.0, dy_pos, 0.0])
                 # translation = R @ t
+                # Assume constant foot orientation
                 translation = t
             else:
                 # Compute translation for step
                 t = np.array([dx, dy_pos, 0.0])
                 # translation = R @ t
+                # Assume constant foot orientation
                 translation = t
 
             # Create new foot pose
@@ -184,6 +187,7 @@ if __name__ == '__main__':
 
     planner = FootStepPlanner(conf)
 
+    # Assume constant foot orientation
     random = False
     if random:
         # Random first footstep initialization
