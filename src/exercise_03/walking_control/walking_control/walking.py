@@ -209,9 +209,6 @@ def main(args=None):
             # Get the current location of the swing foot
             sw_foot_loc_curr = robot.swingFootPose()
 
-            # Get the current location of the swing foot
-            sw_foot_loc_curr = robot.swingFootPose()
-
             # Plan a foot trajectory between current and next foot pose
             foot_traj = SwingFootTrajectory(
                 sw_foot_loc_curr, sw_foot_loc_next, conf.step_dur)
