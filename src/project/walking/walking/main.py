@@ -13,9 +13,13 @@ def main(args=None):
     robot = Go2(sim)
 
     while rclpy.ok():
+        # Step the walking controller
+        robot.step_walking_controller()
+
+        # Step the simulation
         sim.step()
         sim.debug()
-        robot.publish()
+        print(robot.robot.baseCoMOrientation())
 
 
 if __name__ == '__main__':

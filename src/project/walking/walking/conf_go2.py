@@ -1,14 +1,14 @@
 import os
 import numpy as np
-from ament_index_python.packages import get_package_share_directory
+#from ament_index_python.packages import get_package_share_directory
 
 ################################################################################
 # robot
 ################################################################################
 
-talos_description = get_package_share_directory('go2_description')
-urdf = os.path.join(talos_description, "urdf/go2_description.urdf")
-path = os.path.join(talos_description, "meshes/../..")
+go2_description = "/workspaces/walking_quad/MCLR/src/project/go2_description"
+urdf = os.path.join(go2_description, "urdf/go2_description.urdf")
+path = os.path.join(go2_description, "meshes")
 
 
 knee = -1.5

@@ -21,6 +21,8 @@ setup(
     entry_points={
         'console_scripts': [
             'walking = walking.main:main',
+            'testgo = walking.testgo:main',
+            'go2 = walking.go2:main',
         ],
     },
 )
