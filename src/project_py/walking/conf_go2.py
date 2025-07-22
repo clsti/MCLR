@@ -9,6 +9,10 @@ go2_description = "/home/devel/miniconda3/envs/robot_env/share/example-robot-dat
 urdf = os.path.join(go2_description, "urdf/go2.urdf")
 # path = os.path.join(go2_description, "meshes")
 
+lfFoot = "FL_foot"
+rfFoot = "FR_foot"
+lhFoot = "RL_foot"
+rhFoot = "RR_foot"
 
 knee = -1.5
 hipPitch = 1.57 / 2.0 - 0.2

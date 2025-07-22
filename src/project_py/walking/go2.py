@@ -60,5 +60,5 @@ class Go2():
     def set_torque(self, tau):
         self.robot.setActuatedJointTorques(tau)
 
-    def set_position(self, pos):
-        self.robot.setActuatedJointPositions(pos)
+    def set_position(self, pos, vel=None):
+        self.robot.setActuatedJointPositions(pos, v=vel)
