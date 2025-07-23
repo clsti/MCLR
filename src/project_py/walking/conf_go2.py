@@ -31,3 +31,7 @@ q_stable = np.array([
     # ───── rear‑right (RR)   leg ─────
     hipRoll,   hipPitch,   knee
 ])
+
+# TODO: tune Kp and Kd gains joint-wise
+Kp = 30.0
+Kd = 1.0

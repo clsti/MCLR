@@ -32,6 +32,10 @@ class Go2():
             useFixedBase=False
         )
 
+        # PD parameters for torque control
+        self.Kp = conf.Kp
+        self.Kd = conf.Kd
+
     def update(self):
         self.robot.update()
 
@@ -57,7 +61,15 @@ class Go2():
 
         return np.concatenate([q, v])
 
-    def set_torque(self, tau):
+    def set_torque(self, tau_ff, q_d=None, q=None, v_d=None, v=None):
+        if all(x is not None for x in [q_d, q, v_d, v]):
+            q_dif = q_d - q
+            v_dif = v_d - v
+
+            tau = self.Kp * q_dif + self.Kd * v_dif + tau_ff
+        else:
+            tau = tau_ff
+
         self.robot.setActuatedJointTorques(tau)
 
     def set_position(self, pos, vel=None):
