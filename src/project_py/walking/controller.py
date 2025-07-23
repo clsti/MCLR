@@ -92,7 +92,7 @@ class Go2Controller():
         costModel = self._create_contact_cost(supportFootIds, nu)
         # add gravity cost
         self._add_gravity_compensation_cost(costModel, 1e2)
-        self._add_com_height_cost(costModel, weight=1e3)
+        self._add_com_height_cost(costModel, weight=1e1)
 
         # create action model
         action_model = self._create_action_model(
@@ -223,15 +223,12 @@ class Go2Controller():
 
     def _add_gravity_compensation_cost(self, costModel, weight=1e1):
         """Adds gravity compensation cost model"""
-        nu = self.actuation.nu if self._fwddyn else self.state.nv
-        ctrlResidual = crocoddyl.ResidualModelControl(self.state, nu)
-        ctrlReg = crocoddyl.CostModelResidual(self.state, ctrlResidual)
-        costModel.addCost("gravityReg", ctrlReg, weight)
-
-        # Not working for DifferentialActionModelContactFwdDynamics
-        # uResidual = crocoddyl.ResidualModelControlGrav(self.state, nu)
-        # ctrlReg = crocoddyl.CostModelResidual(self.state, uResidual)
-        # costModel.addCost("gravityComp", ctrlReg, weight)
+        nu = self.actuation.nu if self._fwddyn else self.nv
+        uResidual = crocoddyl.ResidualModelContactControlGrav(self.state, nu)
+        activation = crocoddyl.ActivationModelQuad(self.nv)
+        ctrlReg = crocoddyl.CostModelResidual(
+            self.state, activation, uResidual)
+        costModel.addCost("gravityComp", ctrlReg, weight)
 
     def _add_com_height_cost(self, costModel, height_target=0.335, weight=1e2):
         com_ref = np.array([0., 0., height_target])
