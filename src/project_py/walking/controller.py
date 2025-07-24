@@ -25,6 +25,7 @@ class Go2Controller():
         self.rfFoot = conf.rfFoot
         self.lhFoot = conf.lhFoot
         self.rhFoot = conf.rhFoot
+        self.solver = None 
 
         # Getting the frame id for all the legs
         self.lfFootId = self.model.getFrameId(self.lfFoot)
@@ -77,10 +78,27 @@ class Go2Controller():
 
     def solve(self, x0, problem):
         problem = problem(x0)
-        solver = crocoddyl.SolverBoxDDP(problem)
-        solver.solve()
+        self.solver = crocoddyl.SolverBoxDDP(problem)
+        self.solver.solve()
 
-        return solver.us[0], solver.xs[0]
+        return self.solver.us[0], self.solver.xs[0]
+
+    def get_feedback_gains(self, node_index=0):
+        """Get feedback gains k and K from the solved problem"""
+        if self.solver is None:
+            raise RuntimeError("Must call solve() first")
+        
+        if not hasattr(self.solver, 'k') or not hasattr(self.solver, 'K'):
+            raise AttributeError("Feedback gains not available in solver")
+        
+        if len(self.solver.k) <= node_index or len(self.solver.K) <= node_index:
+            raise IndexError(f"Node index {node_index} out of range")
+        
+        k = self.solver.k[node_index]
+        K = self.solver.K[node_index]
+        
+        return k, K
+    
 
     #################################################################################
     # ---------------------------------- Problems --------------------------------- #

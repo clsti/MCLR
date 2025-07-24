@@ -25,7 +25,7 @@ def main():
         x0 = robot.get_state()
         q = x0[7:robot.nq]
         v = x0[robot.nq+6:robot.nq+robot.nv]
-        u0, x0 = controller.solve(x0, controller.standing_problem)
+        u0, xs0 = controller.solve(x0, controller.standing_problem)
         # ------------ TEST ------------
         # q = x0[:robot.nq]
         # v = x0[robot.nq:robot.nq + robot.nv]
@@ -34,9 +34,38 @@ def main():
         # tau = tau[6:]
         # robot.set_torque(tau)
         # ------------ TEST ------------
-        robot.set_torque(u0, q_d, q, v_d, v)
-        # robot.set_torque(u0)
-        # robot.set_position(x0[:robot.nq])
+        
+        try:
+            k, K = controller.get_feedback_gains(node_index=0)
+            
+            state_error = xs0 - x0
+            alpha = 1.0 
+            
+            if state_error.shape[0] == 37 and K.shape[1] == 36:
+                # Convert state error to tangent space representation
+                q_current = x0[:robot.nq]  
+                q_ref = xs0[:robot.nq]     
+                v_current = x0[robot.nq:]  
+                v_ref = xs0[robot.nq:]     
+                
+                # configuration error in tangent space
+                q_error_tangent = pin.difference(controller.model, q_ref, q_current)
+                v_error = v_current - v_ref
+                state_error_tangent = np.concatenate([q_error_tangent, v_error])   
+                
+                             
+                uk = u0 + alpha * k + K @ state_error_tangent
+                #print(f"uo: {u0}\nuk: {uk}")
+            else:
+                uk = u0 + alpha * k + K @ state_error
+
+        except (AttributeError, RuntimeError) as e:
+            print(f"Warning: Could not get feedback gains: {e}")
++            uk = u0
+        
+        #robot.set_torque(uk, q_d, q, v_d, v)
+        #robot.set_torque(u0)
+        #robot.set_position(x0[:robot.nq])
 
         # Step the simulation
         sim.step()
