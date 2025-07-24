@@ -41,6 +41,9 @@ class Go2Controller():
         self.mu = 0.7
         self.Rsurf = np.eye(3)
 
+        # flag for first step
+        self.firstStep = True
+
         # State and actuation model
         self.state = crocoddyl.StateMultibody(self.model)
         self.actuation = crocoddyl.ActuationModelFloatingBase(self.state)
@@ -50,6 +53,10 @@ class Go2Controller():
         self.runningCostModel = crocoddyl.CostModelSum(self.state, nu)
         self.terminalCostModel = crocoddyl.CostModelSum(self.state, nu)
 
+    #################################################################################
+    # ------------------------------ Getter functions ----------------------------- #
+    #################################################################################
+
     def get_foot_states(self):
         rfFootPos0 = self.data.oMf[self.rfFootId].translation
         rhFootPos0 = self.data.oMf[self.rhFootId].translation
@@ -58,11 +65,15 @@ class Go2Controller():
 
         return rfFootPos0, rhFootPos0, lfFootPos0, lhFootPos0
 
-    def get_com_ref(self):
+    def get_com(self):
         rfFootPos0, rhFootPos0, lfFootPos0, lhFootPos0 = self.get_foot_states()
         comRef = (rfFootPos0 + rhFootPos0 + lfFootPos0 + lhFootPos0) / 4
         comRef[2] = self.com_h_ref
         return comRef
+
+    #################################################################################
+    # ----------------------------------- Solver ---------------------------------- #
+    #################################################################################
 
     def solve(self, x0, problem):
         problem = problem(x0)
@@ -70,6 +81,10 @@ class Go2Controller():
         solver.solve()
 
         return solver.us[0], solver.xs[0]
+
+    #################################################################################
+    # ---------------------------------- Problems --------------------------------- #
+    #################################################################################
 
     def standing_problem(self, x0):
         # action models
@@ -89,6 +104,168 @@ class Go2Controller():
 
         return crocoddyl.ShootingProblem(x0, running_action, terminal_action)
 
+    def walking_problem_ocp(self, x0, timeStep, foot_traj, com_traj):
+        """
+        foot_traj: list of multiple foot trajectories according to horizon N
+        com_traj: list of multiple com trajectories according to horizon N
+        """
+        act_models = []
+
+        # TODO
+
+        running_action = act_models[:-1]
+        terminal_action = act_models[-1]
+
+        return crocoddyl.ShootingProblem(x0, running_action, terminal_action)
+
+    def walking_problem_one_step(self, x0, timeStep, foot_traj, com_traj):
+        """
+        foot_traj = [rh_traj, rf_traj, lh_traj, lf_traj]
+        com_traj = [com_traj, com_traj, com_traj, com_traj]
+        """
+        # get trajectories
+        rh_traj, rf_traj, lh_traj, lf_traj = foot_traj
+
+        # action models
+        act_models = []
+
+        # some parameters to put somewhere else
+        initKnots = 2
+        supportFootIds = [self.lfFootId, self.rfFootId,
+                          self.lhFootId, self.rhFootId]
+
+        # walking phase
+        if self.firstStep:
+            # inital double support phase
+            act_models += [self.create_contact_action(
+                timeStep, supportFootIds)for _ in range(initKnots)]
+
+            # Take first initKnots steps (only of half length)
+
+            # ------------------ RIGHT REAR ------------------ #
+            swingFootIds = [self.rhFootId]
+            supportFootIds = [self.lfFootId, self.rfFootId, self.lhFootId]
+            # Right rear foot
+            act_models += [
+                self.createFootstepModels(
+                    timeStep,
+                    com_traj[0],
+                    rh_traj,
+                    supportFootIds,
+                    swingFootIds
+                )
+            ]
+
+            # ------------------ RIGHT FRONT ------------------ #
+            swingFootIds = [self.rfFootId]
+            supportFootIds = [self.lfFootId, self.rhFootId, self.lhFootId]
+            # Right front foot
+            act_models += [
+                self.createFootstepModels(
+                    timeStep,
+                    com_traj[1],
+                    rf_traj,
+                    supportFootIds,
+                    swingFootIds
+                )
+            ]
+
+            self.firstStep = False
+
+        else:
+            # ------------------ RIGHT REAR ------------------ #
+            swingFootIds = [self.rhFootId]
+            supportFootIds = [self.lfFootId, self.rfFootId, self.lhFootId]
+            # Right rear foot
+            act_models += [
+                self.createFootstepModels(
+                    timeStep,
+                    com_traj[0],
+                    rh_traj,
+                    supportFootIds,
+                    swingFootIds
+                )
+            ]
+
+            # ------------------ RIGHT FRONT ------------------ #
+            swingFootIds = [self.rfFootId]
+            supportFootIds = [self.lfFootId, self.rhFootId, self.lhFootId]
+            # Right front foot
+            act_models += [
+                self.createFootstepModels(
+                    timeStep,
+                    com_traj[1],
+                    rf_traj,
+                    supportFootIds,
+                    swingFootIds
+                )
+            ]
+
+        # ------------------ LEFT REAR ------------------ #
+        swingFootIds = [self.lhFootId]
+        supportFootIds = [self.lfFootId, self.rfFootId, self.rhFootId]
+        # Right rear foot
+        act_models += [
+            self.createFootstepModels(
+                timeStep,
+                com_traj[2],
+                lh_traj,
+                supportFootIds,
+                swingFootIds
+            )
+        ]
+
+        # ------------------ LEFT FRONT ------------------ #
+        swingFootIds = [self.lfFootId]
+        supportFootIds = [self.rfFootId, self.rhFootId, self.lhFootId]
+        # Right front foot
+        act_models += [
+            self.createFootstepModels(
+                timeStep,
+                com_traj[3],
+                lf_traj,
+                supportFootIds,
+                swingFootIds
+            )
+        ]
+
+        return act_models
+
+    def createFootstepModels(self, timeStep, com_trajectories, foot_trajectories, supportFootIds, swingFootIds):
+        foot_swing_model = []
+        swing_foot_tasks = []
+        # iterate through timesteps
+        for com_traj, foot_traj in zip(com_trajectories, foot_trajectories):
+            # iterate through foots
+            for com_task, foot_pos_task in zip(com_traj, foot_traj):
+                swing_foot_tasks += [foot_pos_task]
+                foot_swing_model += [
+                    self.create_swingfoot_action(
+                        timeStep, supportFootIds, com_task, foot_pos_task)
+                ]
+
+        # Action model for the foot switch
+        foot_switch_model = self.createFootSwitchModel(
+            swingFootIds, swing_foot_tasks)
+
+        return [*foot_swing_model, foot_switch_model]
+
+    def calc_com_traj(self, com_pos, swing_foot_traj, swingFootIds, supportFootIds, stepLength):
+        numLegs = len(supportFootIds) + len(swingFootIds)
+        comPercentage = float(len(swingFootIds)) / numLegs
+        numKnots = len(swing_foot_traj)
+        comTask = []
+        for i in range(numKnots):
+            comTask.append(
+                np.array([stepLength * (i + 1) / numKnots, 0.0, 0.0]
+                         ) * comPercentage + com_pos
+            )
+        return comTask
+
+    #################################################################################
+    # ---------------------------------- Actions ---------------------------------- #
+    #################################################################################
+
     def create_swingfoot_action(self, timeStep, supportFootIds, comTask, swingFootTask):
         """
         swingFootTask structure: (ID, orientation, position)
@@ -98,22 +275,16 @@ class Go2Controller():
         else:
             nu = self.state.nv + 3 * len(supportFootIds)
 
-        contactModel, costModel = self._create_footswing_model(
-            timeStep, supportFootIds, comTask, swingFootTask, nu)
-
-        action_model = self._create_action_model(
-            timeStep, contactModel, costModel, nu)
-
-        return action_model
-
-    def _create_footswing_model(self, timeStep, supportFootIds, comTask, swingFootTask, nu):
         contactModel = self._create_contact_model(supportFootIds, nu)
         costModel = crocoddyl.CostModelSum(self.state, nu)
         self._add_contact_cost(costModel, supportFootIds, nu)
         self._add_com_cost(costModel, comTask, nu)
         self._add_swingfoot_cost(costModel, swingFootTask, nu)
 
-        return contactModel, costModel
+        action_model = self._create_action_model(
+            timeStep, contactModel, costModel, nu)
+
+        return action_model
 
     def create_contact_action(self, timeStep, supportFootIds):
         if self._fwddyn:
@@ -133,6 +304,10 @@ class Go2Controller():
             timeStep, contactModel, costModel, nu)
 
         return action_model
+
+    #################################################################################
+    # ---------------------------------- Models ----------------------------------- #
+    #################################################################################
 
     def _create_action_model(self, timeStep, contactModel, costModel, nu):
         """Create Action model for KKT conditions"""
@@ -192,6 +367,10 @@ class Go2Controller():
                 self.model.frames[i].name + "_contact", supportContactModel
             )
         return contactModel
+
+    #################################################################################
+    # ----------------------------------- Costs ----------------------------------- #
+    #################################################################################
 
     def _add_swingfoot_cost(self, costModel, swingFootTask, nu):
         """
@@ -292,6 +471,10 @@ class Go2Controller():
         comCost = crocoddyl.CostModelResidual(
             self.state, comActivation, comResidual)
         costModel.addCost("comHeight", comCost, weight)
+
+    #################################################################################
+    # ----------------------------- Foot Switch action ---------------------------- #
+    #################################################################################
 
     def createFootSwitchModel(self, supportFootIds, swingFootTask, pseudoImpulse=False):
         """Action model for a foot switch phase.
