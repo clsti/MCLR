@@ -12,7 +12,9 @@ import numpy as np
 def main():
     sim = PybulletWrapper()
     robot = Go2(sim)
-    controller = Go2Controller(robot.model)
+    # com reference height
+    com_h = robot.robot.baseCoMPosition()[2]
+    controller = Go2Controller(robot.model, com_h)
 
     x0 = robot.get_state()
     q_d = x0[7:robot.nq]
@@ -23,7 +25,7 @@ def main():
         x0 = robot.get_state()
         q = x0[7:robot.nq]
         v = x0[robot.nq+6:robot.nq+robot.nv]
-        u0, x0 = controller.solve(x0)
+        u0, x0 = controller.solve(x0, controller.standing_problem)
         # ------------ TEST ------------
         # q = x0[:robot.nq]
         # v = x0[robot.nq:robot.nq + robot.nv]
@@ -32,8 +34,8 @@ def main():
         # tau = tau[6:]
         # robot.set_torque(tau)
         # ------------ TEST ------------
-        # robot.set_torque(u0, q_d, q, v_d, v)
-        robot.set_torque(u0)
+        robot.set_torque(u0, q_d, q, v_d, v)
+        # robot.set_torque(u0)
         # robot.set_position(x0[:robot.nq])
 
         # Step the simulation
