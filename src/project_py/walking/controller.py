@@ -57,6 +57,7 @@ class Go2Controller():
     #################################################################################
     # ------------------------------ Getter functions ----------------------------- #
     #################################################################################
+    # TODO: NOT USED
 
     def get_foot_states(self):
         rfFootPos0 = self.data.oMf[self.rfFootId].translation
@@ -76,9 +77,12 @@ class Go2Controller():
     # ----------------------------------- Solver ---------------------------------- #
     #################################################################################
 
-    def solve(self, problem):
+    def solve(self, x0, problem):
         self.solver = crocoddyl.SolverBoxDDP(problem)
-        self.solver.solve()
+        xs = [x0] * (self.solver.problem.T + 1)
+        us = self.solver.problem.quasiStatic(
+            [x0] * self.solver.problem.T)
+        self.solver.solve(xs, us, 100, False, 0.1)
 
         return self.solver.us, self.solver.xs
 
@@ -133,8 +137,6 @@ class Go2Controller():
         running_action = act_models[:-1]
         terminal_action = act_models[-1]
 
-        # TODO error
-
         return crocoddyl.ShootingProblem(x0, running_action, terminal_action)
 
     def walking_problem_one_step(self, timeStep, foot_traj, com_traj):
@@ -172,7 +174,7 @@ class Go2Controller():
         )
         # ------------------ RIGHT FRONT ------------------ #
         swingFootIds = [self.rfFootId]
-        supportFootIds = [self.lfFootId, self.rhFootId, self.lhFootId]
+        supportFootIds = [self.lfFootId, self.lhFootId, self.rhFootId]
         # Right front foot
         act_models += self.createFootstepModels(
             timeStep,
@@ -194,7 +196,7 @@ class Go2Controller():
         )
         # ------------------ LEFT FRONT ------------------ #
         swingFootIds = [self.lfFootId]
-        supportFootIds = [self.rfFootId, self.rhFootId, self.lhFootId]
+        supportFootIds = [self.rfFootId, self.lhFootId, self.rhFootId]
         # Right front foot
         act_models += self.createFootstepModels(
             timeStep,
@@ -210,14 +212,11 @@ class Go2Controller():
         foot_swing_model = []
         swing_foot_tasks = []
         # iterate through timesteps
-        for com_task, foot_traj in zip(com_trajectories, foot_trajectories):
-            # iterate through foots
-            for foot_pos_task in foot_traj:
-                swing_foot_tasks += foot_pos_task
-                foot_swing_model += [
-                    self.create_swingfoot_action(
-                        timeStep, supportFootIds, com_task, foot_pos_task)
-                ]
+        for com_task, foot_task in zip(com_trajectories, foot_trajectories):
+            foot_swing_model += [
+                self.create_swingfoot_action(
+                    timeStep, supportFootIds, com_task, foot_task)
+            ]
 
         # Action model for the foot switch
         foot_switch_model = self.createFootSwitchModel(
@@ -272,7 +271,7 @@ class Go2Controller():
         costModel = crocoddyl.CostModelSum(self.state, nu)
         self._add_contact_cost(costModel, supportFootIds, nu)
         # add gravity cost
-        self._add_gravity_compensation_cost(costModel, 1e2)
+        # self._add_gravity_compensation_cost(costModel, 1e2)
 
         # create action model
         action_model = self._create_action_model(
@@ -404,7 +403,7 @@ class Go2Controller():
             )
             ctrlReg = crocoddyl.CostModelResidual(self.state, ctrlResidual)
         costModel.addCost("stateReg", stateReg, 1e1)
-        costModel.addCost("ctrlReg", ctrlReg, 1e4)
+        costModel.addCost("ctrlReg", ctrlReg, 1e-1)
 
         # Bound cost
         lb = np.concatenate(

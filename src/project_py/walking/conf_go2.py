@@ -33,5 +33,5 @@ q_stable = np.array([
 ])
 
 # TODO: tune Kp and Kd gains joint-wise
-Kp = 50.0
+Kp = 60.0
 Kd = 2.0

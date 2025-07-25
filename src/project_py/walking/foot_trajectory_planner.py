@@ -25,21 +25,21 @@ class TrajectoriesPlanner():
         self.rhFoot = conf.rhFoot
 
         # Getting the frame id for all the legs
-        self.lfFootId = self.model.getFrameId(self.lfFoot)
+        self.rhFootId = self.model.getFrameId(self.rhFoot)
         self.rfFootId = self.model.getFrameId(self.rfFoot)
         self.lhFootId = self.model.getFrameId(self.lhFoot)
-        self.rhFootId = self.model.getFrameId(self.rhFoot)
+        self.lfFootId = self.model.getFrameId(self.lfFoot)
 
     def get_foot_states(self, x0):
         q0 = x0[: self.model.nq]
         pin.forwardKinematics(self.model, self.data, q0)
         pin.updateFramePlacements(self.model, self.data)
-        rfFootPos0 = self.data.oMf[self.rfFootId].translation
         rhFootPos0 = self.data.oMf[self.rhFootId].translation
-        lfFootPos0 = self.data.oMf[self.lfFootId].translation
+        rfFootPos0 = self.data.oMf[self.rfFootId].translation
         lhFootPos0 = self.data.oMf[self.lhFootId].translation
+        lfFootPos0 = self.data.oMf[self.lfFootId].translation
 
-        return rfFootPos0, rhFootPos0, lfFootPos0, lhFootPos0
+        return rhFootPos0, rfFootPos0, lhFootPos0, lfFootPos0
 
     def _get_traj(self, x0_foot_positions, x0_com, swingFootIds, half_step=False):
         """
@@ -76,7 +76,7 @@ class TrajectoriesPlanner():
                 tref = p + dp
                 swing_foot_task_k += [[i, pin.SE3(np.eye(3), tref)]]
 
-            foot_traj.append([swing_foot_task_k])
+            foot_traj += [swing_foot_task_k]
             com_traj += [
                 np.array([step_length * (k + 1) / self.n_per_step,
                          0.0, 0.0]) * com_percentage
@@ -126,7 +126,7 @@ class TrajectoriesPlanner():
         for com_traj, foot_traj in zip(com_trajectories, foot_trajectories):
             for com_task, foot_pos_task in zip(com_traj, foot_traj):
                 for com_pos, foot_pos in zip(com_task, foot_pos_task):
-                    pos = foot_pos[1].translation
+                    pos = foot_pos[0][1].translation
                     sim.addSphereMarker(
                         pos, color=[1, 0, 0, 1])  # Red for feet
                     sim.addSphereMarker(
