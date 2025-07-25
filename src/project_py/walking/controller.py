@@ -10,10 +10,10 @@ import crocoddyl
 
 class Go2Controller():
 
-    def __init__(self, model, com_h_ref, integrator="euler", control="zero", fwddyn=True):
+    def __init__(self, model, data, com_h_ref, integrator="euler", control="zero", fwddyn=True):
 
         self.model = model
-        self.data = model.createData()
+        self.data = data
         self.nq = self.model.nq
         self.nv = self.model.nv
         self.nu = self.nv - 6
@@ -130,9 +130,13 @@ class Go2Controller():
         for foot_traj_k, com_traj_k in zip(foot_traj, com_traj):
             act_models += self.walking_problem_one_step(
                 timeStep, foot_traj_k, com_traj_k)
-
+            print(len(act_models))
+        for i in act_models:
+            print(type(i))
         running_action = act_models[:-1]
         terminal_action = act_models[-1]
+
+        # TODO error
 
         return crocoddyl.ShootingProblem(x0, running_action, terminal_action)
 
@@ -162,54 +166,46 @@ class Go2Controller():
         swingFootIds = [self.rhFootId]
         supportFootIds = [self.lfFootId, self.rfFootId, self.lhFootId]
         # Right rear foot
-        act_models += [
-            self.createFootstepModels(
-                timeStep,
-                com_traj[0],
-                rh_traj,
-                supportFootIds,
-                swingFootIds
-            )
-        ]
+        act_models += self.createFootstepModels(
+            timeStep,
+            com_traj[0],
+            rh_traj,
+            supportFootIds,
+            swingFootIds
+        )
         # ------------------ RIGHT FRONT ------------------ #
         swingFootIds = [self.rfFootId]
         supportFootIds = [self.lfFootId, self.rhFootId, self.lhFootId]
         # Right front foot
-        act_models += [
-            self.createFootstepModels(
-                timeStep,
-                com_traj[1],
-                rf_traj,
-                supportFootIds,
-                swingFootIds
-            )
-        ]
+        act_models += self.createFootstepModels(
+            timeStep,
+            com_traj[1],
+            rf_traj,
+            supportFootIds,
+            swingFootIds
+        )
         # ------------------ LEFT REAR ------------------ #
         swingFootIds = [self.lhFootId]
         supportFootIds = [self.lfFootId, self.rfFootId, self.rhFootId]
         # Right rear foot
-        act_models += [
-            self.createFootstepModels(
-                timeStep,
-                com_traj[2],
-                lh_traj,
-                supportFootIds,
-                swingFootIds
-            )
-        ]
+        act_models += self.createFootstepModels(
+            timeStep,
+            com_traj[2],
+            lh_traj,
+            supportFootIds,
+            swingFootIds
+        )
         # ------------------ LEFT FRONT ------------------ #
         swingFootIds = [self.lfFootId]
         supportFootIds = [self.rfFootId, self.rhFootId, self.lhFootId]
         # Right front foot
-        act_models += [
-            self.createFootstepModels(
-                timeStep,
-                com_traj[3],
-                lf_traj,
-                supportFootIds,
-                swingFootIds
-            )
-        ]
+        act_models += self.createFootstepModels(
+            timeStep,
+            com_traj[3],
+            lf_traj,
+            supportFootIds,
+            swingFootIds
+        )
 
         return act_models
 
@@ -217,10 +213,10 @@ class Go2Controller():
         foot_swing_model = []
         swing_foot_tasks = []
         # iterate through timesteps
-        for com_traj, foot_traj in zip(com_trajectories, foot_trajectories):
+        for com_task, foot_traj in zip(com_trajectories, foot_trajectories):
             # iterate through foots
-            for com_task, foot_pos_task in zip(com_traj, foot_traj):
-                swing_foot_tasks += [foot_pos_task]
+            for foot_pos_task in foot_traj:
+                swing_foot_tasks += foot_pos_task
                 foot_swing_model += [
                     self.create_swingfoot_action(
                         timeStep, supportFootIds, com_task, foot_pos_task)
@@ -366,7 +362,7 @@ class Go2Controller():
                 self.state, frameTranslationResidual
             )
             costModel.addCost(
-                self.rmodel.frames[i[0]].name +
+                self.model.frames[i[0]].name +
                 "_footTrack", footTrack, 1e6
             )
 
@@ -498,7 +494,7 @@ class Go2Controller():
                 np.array([0.0, 50.0]),
             )
             contactModel.addContact(
-                self.rmodel.frames[i].name + "_contact", supportContactModel
+                self.model.frames[i].name + "_contact", supportContactModel
             )
         # Creating the cost model for a contact phase
         costModel = crocoddyl.CostModelSum(self.state, nu)
@@ -514,7 +510,7 @@ class Go2Controller():
                 self.state, coneActivation, coneResidual
             )
             costModel.addCost(
-                self.rmodel.frames[i].name + "_frictionCone", frictionCone, 1e1
+                self.model.frames[i].name + "_frictionCone", frictionCone, 1e1
             )
         if swingFootTask is not None:
             for i in swingFootTask:
@@ -535,22 +531,22 @@ class Go2Controller():
                     self.state, frameVelocityResidual
                 )
                 costModel.addCost(
-                    self.rmodel.frames[i[0]].name +
+                    self.model.frames[i[0]].name +
                     "_footTrack", footTrack, 1e7
                 )
                 costModel.addCost(
-                    self.rmodel.frames[i[0]].name + "_impulseVel",
+                    self.model.frames[i[0]].name + "_impulseVel",
                     impulseFootVelCost,
                     1e6,
                 )
         stateWeights = np.array(
             [0.0] * 3
             + [500.0] * 3
-            + [0.01] * (self.rmodel.nv - 6)
-            + [10.0] * self.rmodel.nv
+            + [0.01] * (self.model.nv - 6)
+            + [10.0] * self.model.nv
         )
         stateResidual = crocoddyl.ResidualModelState(
-            self.state, self.rmodel.defaultState, nu
+            self.state, self.model.defaultState, nu
         )
         stateActivation = crocoddyl.ActivationModelWeightedQuad(
             stateWeights**2)
@@ -612,7 +608,7 @@ class Go2Controller():
                 self.state, i, pin.LOCAL_WORLD_ALIGNED
             )
             impulseModel.addImpulse(
-                self.rmodel.frames[i].name + "_impulse", supportContactModel
+                self.model.frames[i].name + "_impulse", supportContactModel
             )
         # Creating the cost model for a contact phase
         costModel = crocoddyl.CostModelSum(self.state, 0)
@@ -625,14 +621,14 @@ class Go2Controller():
                     self.state, frameTranslationResidual
                 )
                 costModel.addCost(
-                    self.rmodel.frames[i[0]].name +
+                    self.model.frames[i[0]].name +
                     "_footTrack", footTrack, 1e7
                 )
         stateWeights = np.array(
-            [1.0] * 6 + [10.0] * (self.rmodel.nv - 6) + [10.0] * self.rmodel.nv
+            [1.0] * 6 + [10.0] * (self.model.nv - 6) + [10.0] * self.model.nv
         )
         stateResidual = crocoddyl.ResidualModelState(
-            self.state, self.rmodel.defaultState, 0
+            self.state, self.model.defaultState, 0
         )
         stateActivation = crocoddyl.ActivationModelWeightedQuad(
             stateWeights**2)

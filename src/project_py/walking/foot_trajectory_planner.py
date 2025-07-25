@@ -6,10 +6,10 @@ import walking.conf_go2 as conf
 
 class TrajectoriesPlanner():
 
-    def __init__(self, model, step_length, step_height, time_step, n_per_step):
+    def __init__(self, model, data, step_length, step_height, time_step, n_per_step):
 
         self.model = model
-        self.data = model.createData()
+        self.data = data
 
         self.step_length = step_length
         self.step_height = step_height
@@ -30,7 +30,10 @@ class TrajectoriesPlanner():
         self.lhFootId = self.model.getFrameId(self.lhFoot)
         self.rhFootId = self.model.getFrameId(self.rhFoot)
 
-    def get_foot_states(self):
+    def get_foot_states(self, x0):
+        q0 = x0[: self.model.nq]
+        pin.forwardKinematics(self.model, self.data, q0)
+        pin.updateFramePlacements(self.model, self.data)
         rfFootPos0 = self.data.oMf[self.rfFootId].translation
         rhFootPos0 = self.data.oMf[self.rhFootId].translation
         lfFootPos0 = self.data.oMf[self.lfFootId].translation
@@ -73,7 +76,7 @@ class TrajectoriesPlanner():
                 tref = p + dp
                 swing_foot_task_k += [[i, pin.SE3(np.eye(3), tref)]]
 
-            foot_traj += swing_foot_task_k
+            foot_traj.append([swing_foot_task_k])
             com_traj += [
                 np.array([step_length * (k + 1) / self.n_per_step,
                          0.0, 0.0]) * com_percentage
@@ -92,23 +95,23 @@ class TrajectoriesPlanner():
         """
         x0_rh, x0_rf, x0_lh, x0_lf = x0_pos
         if self.first_step:
-            rh_traj = self._get_traj(x0_rh, x0_com, [self.rhFootId], True)
-            rf_traj = self._get_traj(x0_rf, x0_com, [self.rfFootId], True)
+            rh_traj = self._get_traj([x0_rh], x0_com, [self.rhFootId], True)
+            rf_traj = self._get_traj([x0_rf], x0_com, [self.rfFootId], True)
             self.first_step = False
         else:
-            rh_traj = self._get_traj(x0_rh, x0_com, [self.rhFootId])
-            rf_traj = self._get_traj(x0_rf, x0_com, [self.rfFootId])
-        lh_traj = self._get_traj(x0_lh, x0_com, [self.lhFootId], True)
-        lf_traj = self._get_traj(x0_lf, x0_com, [self.lfFootId], True)
+            rh_traj = self._get_traj([x0_rh], x0_com, [self.rhFootId])
+            rf_traj = self._get_traj([x0_rf], x0_com, [self.rfFootId])
+        lh_traj = self._get_traj([x0_lh], x0_com, [self.lhFootId])
+        lf_traj = self._get_traj([x0_lf], x0_com, [self.lfFootId])
 
         return rh_traj, rf_traj, lh_traj, lf_traj
 
-    def get_N_full_steps(self, N, x0_com):
+    def get_N_full_steps(self, x0, N, x0_com):
         foot_traj_N = []
         com_traj_N = []
 
         # get foot positions
-        x0_pos = self.get_foot_states()
+        x0_pos = self.get_foot_states(x0)
 
         for _ in range(N):
             rh_traj, rf_traj, lh_traj, lf_traj = self.get_full_step_itr(
@@ -118,3 +121,13 @@ class TrajectoriesPlanner():
             com_traj_N.append([rh_traj[1], rf_traj[1], lh_traj[1], lf_traj[1]])
 
         return foot_traj_N, com_traj_N
+
+    def visualize_trajectories(self, sim, foot_trajectories, com_trajectories):
+        for com_traj, foot_traj in zip(com_trajectories, foot_trajectories):
+            for com_task, foot_pos_task in zip(com_traj, foot_traj):
+                for com_pos, foot_pos in zip(com_task, foot_pos_task):
+                    pos = foot_pos[1].translation
+                    sim.addSphereMarker(
+                        pos, color=[1, 0, 0, 1])  # Red for feet
+                    sim.addSphereMarker(
+                        com_pos, color=[0, 1, 0, 1])  # Green for COM

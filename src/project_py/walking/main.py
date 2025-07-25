@@ -15,7 +15,7 @@ def main():
     robot = Go2(sim)
     # com reference height
     com_h = robot.robot.baseCoMPosition()[2]
-    controller = Go2Controller(robot.model, com_h)
+    controller = Go2Controller(robot.model, robot.data, com_h)
 
     x0 = robot.get_state()
     q_d = x0[7:robot.nq]
@@ -24,27 +24,17 @@ def main():
 
     # get trajectory  for N steps
     N = 4
-    step_length = 0.25
+    step_length = 0.2
     step_height = 0.15
-    time_step = 1e-2
-    n_per_step = 50
-    traj_planner = TrajectoriesPlanner(robot.model, step_length,
+    time_step = 1e-1
+    n_per_step = 100
+    traj_planner = TrajectoriesPlanner(robot.model, robot.data, step_length,
                                        step_height, time_step, n_per_step)
 
     foot_trajectories, com_trajectories = traj_planner.get_N_full_steps(
-        N, x0_com)
+        robot.x_0, N, x0_com)
 
-    def visualize_trajectories(sim, foot_trajectories, com_trajectories):
-        for com_traj, foot_traj in zip(com_trajectories, foot_trajectories):
-            for com_task, foot_pos_task in zip(com_traj, foot_traj):
-                for com_pos, foot_pos in zip(com_task, foot_pos_task):
-                    pos = foot_pos[1].translation
-                    sim.addSphereMarker(
-                        pos, color=[1, 0, 0, 1])  # Red for feet
-                    sim.addSphereMarker(
-                        com_pos, color=[0, 1, 0, 1])  # Green for COM
-
-    visualize_trajectories(sim, foot_trajectories, com_trajectories)
+    # traj_planner.visualize_trajectories(sim, foot_trajectories, com_trajectories)
 
     # ocp
     problem = controller.walking_problem_ocp(
@@ -58,8 +48,8 @@ def main():
         q = x0[7:robot.nq]
         v = x0[robot.nq+6:robot.nq+robot.nv]
 
-        q_d = x_d[:robot.nq]
-        v_d = x_d[robot.nq:]
+        q_d = x_d[7:robot.nq]
+        v_d = x_d[robot.nq+6:]
 
         # ------------ TEST ------------
         """
@@ -109,7 +99,7 @@ def main():
         sim.step()
         sim.debug()
 
-        time.sleep(0.01)
+        time.sleep(0.05)
 
 
 if __name__ == '__main__':

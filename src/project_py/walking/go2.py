@@ -15,6 +15,7 @@ class Go2():
 
         self.go2 = example_robot_data.load("go2")
         self.model = self.go2.model
+        self.data = self.model.createData()
         self.nq = self.model.nq
         self.nv = self.model.nv
         self.nu = self.nv - 6
@@ -35,6 +36,9 @@ class Go2():
         # PD parameters for torque control
         self.Kp = conf.Kp
         self.Kd = conf.Kd
+
+        # Fallback torque
+        self.tau_ff_fallback = np.zeros(12)
 
     def update(self):
         self.robot.update()
@@ -65,6 +69,15 @@ class Go2():
         return self.robot.baseCoMPosition()
 
     def set_torque(self, tau_ff, q_d=None, q=None, v_d=None, v=None):
+        # Torque from crocoddyl sometimes empty -> use fallback torque from previous run if possible
+        print(tau_ff.shape)
+        if tau_ff.shape == (0,):
+            print("FALLBACK")
+            tau_ff = self.tau_ff_fallback
+        else:
+            # store fallback torque
+            self.tau_ff_fallback = tau_ff
+
         if all(x is not None for x in [q_d, q, v_d, v]):
             q_dif = q_d - q
             v_dif = v_d - v
