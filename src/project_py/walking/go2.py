@@ -70,9 +70,7 @@ class Go2():
 
     def set_torque(self, tau_ff, q_d=None, q=None, v_d=None, v=None):
         # Torque from crocoddyl sometimes empty -> use fallback torque from previous run if possible
-        print(tau_ff.shape)
         if tau_ff.shape == (0,):
-            print("FALLBACK")
             tau_ff = self.tau_ff_fallback
         else:
             # store fallback torque

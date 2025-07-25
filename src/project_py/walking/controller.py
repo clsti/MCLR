@@ -130,9 +130,6 @@ class Go2Controller():
         for foot_traj_k, com_traj_k in zip(foot_traj, com_traj):
             act_models += self.walking_problem_one_step(
                 timeStep, foot_traj_k, com_traj_k)
-            print(len(act_models))
-        for i in act_models:
-            print(type(i))
         running_action = act_models[:-1]
         terminal_action = act_models[-1]
 
