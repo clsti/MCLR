@@ -25,7 +25,7 @@ class Go2Controller():
         self.rfFoot = conf.rfFoot
         self.lhFoot = conf.lhFoot
         self.rhFoot = conf.rhFoot
-        self.solver = None 
+        self.solver = None
 
         # Getting the frame id for all the legs
         self.lfFootId = self.model.getFrameId(self.lfFoot)
@@ -76,29 +76,27 @@ class Go2Controller():
     # ----------------------------------- Solver ---------------------------------- #
     #################################################################################
 
-    def solve(self, x0, problem):
-        problem = problem(x0)
+    def solve(self, problem):
         self.solver = crocoddyl.SolverBoxDDP(problem)
         self.solver.solve()
 
-        return self.solver.us[0], self.solver.xs[0]
+        return self.solver.us, self.solver.xs
 
     def get_feedback_gains(self, node_index=0):
         """Get feedback gains k and K from the solved problem"""
         if self.solver is None:
             raise RuntimeError("Must call solve() first")
-        
+
         if not hasattr(self.solver, 'k') or not hasattr(self.solver, 'K'):
             raise AttributeError("Feedback gains not available in solver")
-        
+
         if len(self.solver.k) <= node_index or len(self.solver.K) <= node_index:
             raise IndexError(f"Node index {node_index} out of range")
-        
+
         k = self.solver.k[node_index]
         K = self.solver.K[node_index]
-        
+
         return k, K
-    
 
     #################################################################################
     # ---------------------------------- Problems --------------------------------- #
@@ -129,14 +127,16 @@ class Go2Controller():
         """
         act_models = []
 
-        # TODO
+        for foot_traj_k, com_traj_k in zip(foot_traj, com_traj):
+            act_models += self.walking_problem_one_step(
+                timeStep, foot_traj_k, com_traj_k)
 
         running_action = act_models[:-1]
         terminal_action = act_models[-1]
 
         return crocoddyl.ShootingProblem(x0, running_action, terminal_action)
 
-    def walking_problem_one_step(self, x0, timeStep, foot_traj, com_traj):
+    def walking_problem_one_step(self, timeStep, foot_traj, com_traj):
         """
         foot_traj = [rh_traj, rf_traj, lh_traj, lf_traj]
         com_traj = [com_traj, com_traj, com_traj, com_traj]
@@ -158,67 +158,32 @@ class Go2Controller():
             act_models += [self.create_contact_action(
                 timeStep, supportFootIds)for _ in range(initKnots)]
 
-            # Take first initKnots steps (only of half length)
-
-            # ------------------ RIGHT REAR ------------------ #
-            swingFootIds = [self.rhFootId]
-            supportFootIds = [self.lfFootId, self.rfFootId, self.lhFootId]
-            # Right rear foot
-            act_models += [
-                self.createFootstepModels(
-                    timeStep,
-                    com_traj[0],
-                    rh_traj,
-                    supportFootIds,
-                    swingFootIds
-                )
-            ]
-
-            # ------------------ RIGHT FRONT ------------------ #
-            swingFootIds = [self.rfFootId]
-            supportFootIds = [self.lfFootId, self.rhFootId, self.lhFootId]
-            # Right front foot
-            act_models += [
-                self.createFootstepModels(
-                    timeStep,
-                    com_traj[1],
-                    rf_traj,
-                    supportFootIds,
-                    swingFootIds
-                )
-            ]
-
-            self.firstStep = False
-
-        else:
-            # ------------------ RIGHT REAR ------------------ #
-            swingFootIds = [self.rhFootId]
-            supportFootIds = [self.lfFootId, self.rfFootId, self.lhFootId]
-            # Right rear foot
-            act_models += [
-                self.createFootstepModels(
-                    timeStep,
-                    com_traj[0],
-                    rh_traj,
-                    supportFootIds,
-                    swingFootIds
-                )
-            ]
-
-            # ------------------ RIGHT FRONT ------------------ #
-            swingFootIds = [self.rfFootId]
-            supportFootIds = [self.lfFootId, self.rhFootId, self.lhFootId]
-            # Right front foot
-            act_models += [
-                self.createFootstepModels(
-                    timeStep,
-                    com_traj[1],
-                    rf_traj,
-                    supportFootIds,
-                    swingFootIds
-                )
-            ]
-
+        # ------------------ RIGHT REAR ------------------ #
+        swingFootIds = [self.rhFootId]
+        supportFootIds = [self.lfFootId, self.rfFootId, self.lhFootId]
+        # Right rear foot
+        act_models += [
+            self.createFootstepModels(
+                timeStep,
+                com_traj[0],
+                rh_traj,
+                supportFootIds,
+                swingFootIds
+            )
+        ]
+        # ------------------ RIGHT FRONT ------------------ #
+        swingFootIds = [self.rfFootId]
+        supportFootIds = [self.lfFootId, self.rhFootId, self.lhFootId]
+        # Right front foot
+        act_models += [
+            self.createFootstepModels(
+                timeStep,
+                com_traj[1],
+                rf_traj,
+                supportFootIds,
+                swingFootIds
+            )
+        ]
         # ------------------ LEFT REAR ------------------ #
         swingFootIds = [self.lhFootId]
         supportFootIds = [self.lfFootId, self.rfFootId, self.rhFootId]
@@ -232,7 +197,6 @@ class Go2Controller():
                 swingFootIds
             )
         ]
-
         # ------------------ LEFT FRONT ------------------ #
         swingFootIds = [self.lfFootId]
         supportFootIds = [self.rfFootId, self.rhFootId, self.lhFootId]

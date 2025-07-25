@@ -61,6 +61,9 @@ class Go2():
 
         return np.concatenate([q, v])
 
+    def get_com(self):
+        return self.robot.baseCoMPosition()
+
     def set_torque(self, tau_ff, q_d=None, q=None, v_d=None, v=None):
         if all(x is not None for x in [q_d, q, v_d, v]):
             q_dif = q_d - q
