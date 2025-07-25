@@ -55,25 +55,6 @@ class Go2Controller():
         self.terminalCostModel = crocoddyl.CostModelSum(self.state, nu)
 
     #################################################################################
-    # ------------------------------ Getter functions ----------------------------- #
-    #################################################################################
-    # TODO: NOT USED
-
-    def get_foot_states(self):
-        rfFootPos0 = self.data.oMf[self.rfFootId].translation
-        rhFootPos0 = self.data.oMf[self.rhFootId].translation
-        lfFootPos0 = self.data.oMf[self.lfFootId].translation
-        lhFootPos0 = self.data.oMf[self.lhFootId].translation
-
-        return rfFootPos0, rhFootPos0, lfFootPos0, lhFootPos0
-
-    def get_com(self):
-        rfFootPos0, rhFootPos0, lfFootPos0, lhFootPos0 = self.get_foot_states()
-        comRef = (rfFootPos0 + rhFootPos0 + lfFootPos0 + lhFootPos0) / 4
-        comRef[2] = self.com_h_ref
-        return comRef
-
-    #################################################################################
     # ----------------------------------- Solver ---------------------------------- #
     #################################################################################
 
@@ -206,6 +187,10 @@ class Go2Controller():
             swingFootIds
         )
 
+        # TODO: Double support phase in between?
+        act_models += [self.create_contact_action(
+            timeStep, supportFootIds)]
+
         return act_models
 
     def createFootstepModels(self, timeStep, com_trajectories, foot_trajectories, supportFootIds, swingFootIds):
@@ -223,18 +208,6 @@ class Go2Controller():
             swingFootIds, swing_foot_tasks)
 
         return [*foot_swing_model, foot_switch_model]
-
-    def calc_com_traj(self, com_pos, swing_foot_traj, swingFootIds, supportFootIds, stepLength):
-        numLegs = len(supportFootIds) + len(swingFootIds)
-        comPercentage = float(len(swingFootIds)) / numLegs
-        numKnots = len(swing_foot_traj)
-        comTask = []
-        for i in range(numKnots):
-            comTask.append(
-                np.array([stepLength * (i + 1) / numKnots, 0.0, 0.0]
-                         ) * comPercentage + com_pos
-            )
-        return comTask
 
     #################################################################################
     # ---------------------------------- Actions ---------------------------------- #
@@ -270,8 +243,6 @@ class Go2Controller():
         contactModel = self._create_contact_model(supportFootIds, nu)
         costModel = crocoddyl.CostModelSum(self.state, nu)
         self._add_contact_cost(costModel, supportFootIds, nu)
-        # add gravity cost
-        # self._add_gravity_compensation_cost(costModel, 1e2)
 
         # create action model
         action_model = self._create_action_model(
@@ -426,25 +397,6 @@ class Go2Controller():
             self.state, com_d, nu)
         comTrack = crocoddyl.CostModelResidual(self.state, com_residual)
         costModel.addCost("comTrack", comTrack, 1e6)
-
-    def _add_gravity_compensation_cost(self, costModel, weight=1e1):
-        """Adds gravity compensation cost model"""
-        nu = self.actuation.nu if self._fwddyn else self.nv
-        uResidual = crocoddyl.ResidualModelContactControlGrav(self.state, nu)
-        activation = crocoddyl.ActivationModelQuad(self.nv)
-        ctrlReg = crocoddyl.CostModelResidual(
-            self.state, activation, uResidual)
-        costModel.addCost("gravityComp", ctrlReg, weight)
-
-    def _add_com_height_cost(self, costModel, height_target=0.335, weight=1e2):
-        com_ref = np.array([0., 0., height_target])
-        comResidual = crocoddyl.ResidualModelCoMPosition(
-            self.state, com_ref, self.actuation.nu)
-        comActivation = crocoddyl.ActivationModelWeightedQuad(
-            np.array([1., 1., 10.]))
-        comCost = crocoddyl.CostModelResidual(
-            self.state, comActivation, comResidual)
-        costModel.addCost("comHeight", comCost, weight)
 
     #################################################################################
     # ----------------------------- Foot Switch action ---------------------------- #

@@ -6,10 +6,14 @@ from walking.go2 import Go2
 from walking.controller import Go2Controller
 from walking.foot_trajectory_planner import TrajectoriesPlanner
 
-from pinocchio.visualize import MeshcatVisualizer
-
 import pinocchio as pin
 import numpy as np
+
+# Some TODO
+# - Run torque updates ar a lower frequency than simulation updates
+# - MPC (timing relevant!)
+# - tune PD-gains jointwise
+# - all weights in config for easier tuning
 
 
 def main():
@@ -52,7 +56,6 @@ def main():
         model_visu = robot.model.copy()
         data_visu = model_visu.createData()
         joint_frames = ["FL_foot", "FR_foot", "RL_foot", "RR_foot"]
-        # Define a unique color for each foot: [R, G, B, Alpha]
         colors = {
             "FL_foot": [1, 0, 0, 1],  # Red
             "FR_foot": [0, 1, 0, 1],  # Green
@@ -90,17 +93,10 @@ def main():
         sim.step()
         sim.debug()
 
-        time.sleep(0.05)
+        time.sleep(0.01)
 
         # ------------ TEST ------------
         """
-        q = x0[:robot.nq]
-        v = x0[robot.nq:robot.nq + robot.nv]
-        tau = pin.rnea(controller.model, controller.data,
-                       q, v, np.zeros_like(v))
-        tau = tau[6:]
-        robot.set_torque(tau)
-
         try:
             k, K = controller.get_feedback_gains(node_index=0)
 
