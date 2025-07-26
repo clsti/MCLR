@@ -67,6 +67,36 @@ class Go2Controller():
 
         return self.solver.us, self.solver.xs
 
+    def solve_with_initial_guess(self, x0, problem, xs_init, us_init):
+        """
+        Solve the optimal control problem with an initial guess (warm start).
+        
+        Args:
+            x0: Initial state
+            problem: Crocoddyl shooting problem
+            xs_init: Initial guess for state trajectory
+            us_init: Initial guess for control trajectory
+            
+        Returns:
+            tuple: (controls, states)
+        """
+        self.solver = crocoddyl.SolverBoxDDP(problem)
+        
+        # Use provided initial guess
+        if us_init is not None and len(us_init) == self.solver.problem.T:
+            us = us_init
+        else:
+            us = self.solver.problem.quasiStatic([x0] * self.solver.problem.T)
+            
+        if xs_init is not None and len(xs_init) == self.solver.problem.T + 1:
+            xs = xs_init
+        else:
+            xs = [x0] * (self.solver.problem.T + 1)
+        
+        self.solver.solve(xs, us, 100, False, 0.1)
+        return self.solver.us, self.solver.xs
+
+
     def get_feedback_gains(self, node_index=0):
         """Get feedback gains k and K from the solved problem"""
         if self.solver is None:
@@ -122,11 +152,11 @@ class Go2Controller():
 
     def walking_problem_one_step(self, timeStep, foot_traj, com_traj):
         """
-        foot_traj = [rh_traj, rf_traj, lh_traj, lf_traj]
+        foot_traj = [rh_traj, lf_traj, rf_traj, lh_traj]
         com_traj = [com_traj, com_traj, com_traj, com_traj]
         """
         # get trajectories
-        rh_traj, rf_traj, lh_traj, lf_traj = foot_traj
+        rh_traj, lf_traj, rf_traj, lh_traj = foot_traj
 
         # action models
         act_models = []
@@ -153,13 +183,24 @@ class Go2Controller():
             supportFootIds,
             swingFootIds
         )
+        # ------------------ LEFT FRONT ------------------ #
+        swingFootIds = [self.lfFootId]
+        supportFootIds = [self.rfFootId, self.lhFootId, self.rhFootId]
+        # Left front foot
+        act_models += self.createFootstepModels(
+            timeStep,
+            com_traj[1],
+            lf_traj,
+            supportFootIds,
+            swingFootIds
+        )
         # ------------------ RIGHT FRONT ------------------ #
         swingFootIds = [self.rfFootId]
         supportFootIds = [self.lfFootId, self.lhFootId, self.rhFootId]
         # Right front foot
         act_models += self.createFootstepModels(
             timeStep,
-            com_traj[1],
+            com_traj[2],
             rf_traj,
             supportFootIds,
             swingFootIds
@@ -167,22 +208,11 @@ class Go2Controller():
         # ------------------ LEFT REAR ------------------ #
         swingFootIds = [self.lhFootId]
         supportFootIds = [self.lfFootId, self.rfFootId, self.rhFootId]
-        # Right rear foot
-        act_models += self.createFootstepModels(
-            timeStep,
-            com_traj[2],
-            lh_traj,
-            supportFootIds,
-            swingFootIds
-        )
-        # ------------------ LEFT FRONT ------------------ #
-        swingFootIds = [self.lfFootId]
-        supportFootIds = [self.rfFootId, self.lhFootId, self.rhFootId]
-        # Right front foot
+        # Left rear foot
         act_models += self.createFootstepModels(
             timeStep,
             com_traj[3],
-            lf_traj,
+            lh_traj,
             supportFootIds,
             swingFootIds
         )

@@ -33,9 +33,9 @@ class Go2():
             useFixedBase=False
         )
 
-        # PD parameters for torque control
-        self.Kp = conf.Kp
-        self.Kd = conf.Kd
+        # PD parameters 
+        self.Kp = conf.Kp  
+        self.Kd = conf.Kd  
 
         # Fallback torque
         self.tau_ff_fallback = np.zeros(12)
@@ -69,6 +69,7 @@ class Go2():
         return self.robot.baseCoMPosition()
 
     def set_torque(self, tau_ff, q_d=None, q=None, v_d=None, v=None):
+        
         # Torque from crocoddyl sometimes empty -> use fallback torque from previous run if possible
         if tau_ff.shape == (0,):
             tau_ff = self.tau_ff_fallback
@@ -81,6 +82,8 @@ class Go2():
             v_dif = v_d - v
 
             tau = self.Kp * q_dif + self.Kd * v_dif + tau_ff
+            #print(f"tauf_ff: {tau_ff}, tau: {tau}")
+            #print(f"difference between tau: {tau - tau_ff}")
         else:
             tau = tau_ff
 
@@ -88,3 +91,6 @@ class Go2():
 
     def set_position(self, pos, vel=None):
         self.robot.setActuatedJointPositions(pos, v=vel)
+
+
+

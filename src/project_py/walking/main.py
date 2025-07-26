@@ -5,7 +5,8 @@ from simulator.pybullet_wrapper import PybulletWrapper
 from walking.go2 import Go2
 from walking.controller import Go2Controller
 from walking.foot_trajectory_planner import TrajectoriesPlanner
-
+from walking.mpc_controller import MPCController
+import walking.conf_go2 as conf
 import pinocchio as pin
 import numpy as np
 
@@ -19,6 +20,7 @@ import numpy as np
 def main():
     sim = PybulletWrapper()
     robot = Go2(sim)
+    
     # com reference height
     com_h = robot.robot.baseCoMPosition()[2]
     controller = Go2Controller(robot.model, robot.data, com_h)
@@ -28,17 +30,86 @@ def main():
     v_d = x0[robot.nq+6:robot.nq+robot.nv]
     x0_com = robot.get_com()
 
-    # get trajectory  for N steps
-    N = 4
-    step_length = 0.25
-    step_height = 0.10
-    time_step = 1e-2
-    n_per_step = 100
+    # Create trajectory planner
+    step_length = conf.step_length
+    step_height = conf.step_height
+    time_step = conf.time_step
+    n_per_step = conf.n_per_step
+    
     traj_planner = TrajectoriesPlanner(robot.model, robot.data, step_length,
                                        step_height, time_step, n_per_step)
 
+    
+    if conf.mpc_enabled:
+        print("\n=== Using MPC Controller ===")
+        mpc = MPCController(robot, controller, traj_planner)
+        run_mpc_control(sim, robot, mpc, x0)
+    else:
+        print("\n=== Using Traditional Pre-planned Controller ===")
+        run_opc_control(sim, robot, controller, traj_planner, x0, x0_com)
+
+
+def run_mpc_control(sim, robot, mpc, x0):
+    """
+    Run the MPC control loop.
+    """
+    print("Starting MPC control loop...")
+    
+    control_counter = 0
+    max_steps = 1000  # Safety limit
+    
+    for i in range(max_steps):
+        # Get current robot state
+        robot.update()
+        current_state = robot.get_state()
+        
+        # MPC step - get control and desired state
+        if control_counter == 0:
+            try:
+                u, x_d = mpc.step(current_state)
+                if u is None or x_d is None:
+                    print("MPC returned no control, stopping.")
+                    break
+            except Exception as e:
+                print(f"MPC step failed: {e}")
+                break
+        
+        # Apply control
+        if u is not None and x_d is not None:
+            q = current_state[7:robot.nq]
+            v = current_state[robot.nq+6:robot.nq+robot.nv]
+            q_d = x_d[7:robot.nq]
+            v_d = x_d[robot.nq+6:]
+            robot.set_torque(u, q_d, q, v_d, v)
+        
+        # Step simulation
+        sim.step()
+        sim.debug()
+        time.sleep(conf.sim_time_step)
+        
+        # Update control counter
+        control_counter = (control_counter + 1) % conf.control_steps_per_sim
+        
+        # Print stats periodically
+        if i % 100 == 0:
+            stats = mpc.get_stats()
+            print(f"Step {i}: Leg {stats['leg_counter']}, "
+                  f"Full steps: {stats['full_step_counter']}, "
+                  f"Controls remaining: {stats['controls_remaining']}")
+    
+    print("MPC control loop finished.")
+
+
+def run_opc_control(sim, robot, controller, traj_planner, x0, x0_com):
+    """
+    Run the traditional pre-planned control loop.
+    """
+    print("Starting traditional control loop...")
+    
+    # get trajectory for N steps
+    N = conf.n_steps
     foot_trajectories, com_trajectories = traj_planner.get_N_full_steps(
-        robot.x_0, N, x0_com)
+        x0, N, x0_com)
 
     VISU = False  # do not set true for large n_per_step (takes much time!)
     if VISU:
@@ -47,7 +118,7 @@ def main():
 
     # ocp
     problem = controller.walking_problem_ocp(
-        x0, time_step, foot_trajectories, com_trajectories)
+        x0, conf.time_step, foot_trajectories, com_trajectories)
 
     controls, states = controller.solve(x0, problem)
 
@@ -75,25 +146,43 @@ def main():
     VISU = False
     if VISU:
         visualize()
-
-    for u, x_d, in zip(controls, states):
+        
+    control_counter = 0
+    current_control_idx = 0
+    current_torque = None
+    x_d = None
+    
+    total_sim_steps = len(controls) * conf.control_steps_per_sim
+    
+    for i in range(total_sim_steps):
+        if control_counter == 0:
+            if current_control_idx < len(controls):
+                u = controls[current_control_idx]
+                x_d = states[current_control_idx]
+                current_torque = u
+                current_control_idx += 1
+            else:
+                print("No more controls available.")
+                break
+        
         robot.update()
         x0 = robot.get_state()
         q = x0[7:robot.nq]
         v = x0[robot.nq+6:robot.nq+robot.nv]
-
-        q_d = x_d[7:robot.nq]
-        v_d = x_d[robot.nq+6:]
-
-        robot.set_torque(u, q_d, q, v_d, v)
-        # robot.set_torque(u)
-        # robot.set_position(x_d[:robot.nq])
+        
+        if current_torque is not None and x_d is not None:
+            q_d = x_d[7:robot.nq]
+            v_d = x_d[robot.nq+6:]
+            robot.set_torque(current_torque, q_d, q, v_d, v)
+            # robot.set_torque(u)
+            #robot.set_position(x_d[:robot.nq])
 
         # Step the simulation
         sim.step()
         sim.debug()
 
-        time.sleep(0.01)
+        time.sleep(conf.sim_time_step)
+        control_counter = (control_counter + 1) % conf.control_steps_per_sim
 
         # ------------ TEST ------------
         """
