@@ -55,6 +55,51 @@ def run_mpc_control(sim, robot, mpc, x0):
     """
     print("Starting MPC control loop...")
     
+    # Visualization setup
+    VISU = False  # Set to True to enable trajectory visualization (warning: may slow down simulation!)
+    visualization_counter = 0
+    
+    def visualize_mpc_trajectory(states, color_offset=0):
+        """Visualize MPC planned trajectory."""
+        if not states or len(states) < 2:
+            return
+            
+        xs_array = [np.array(x) for x in states]
+        model_visu = robot.model.copy()
+        data_visu = model_visu.createData()
+        joint_frames = ["FL_foot", "FR_foot", "RL_foot", "RR_foot"]
+        
+        # Different colors for different MPC replans
+        base_colors = [
+            [1, 0, 0, 0.7],  # Red
+            [0, 1, 0, 0.7],  # Green
+            [0, 0, 1, 0.7],  # Blue
+            [1, 1, 0, 0.7],  # Yellow
+        ]
+        
+        # Cycle through colors for different replans
+        colors = {}
+        for i, frame in enumerate(joint_frames):
+            color = base_colors[i].copy()
+            # Modify color intensity based on replan number
+            intensity = max(0.3, 1.0 - (color_offset * 0.2) % 0.7)
+            color[0] *= intensity
+            color[1] *= intensity 
+            color[2] *= intensity
+            colors[frame] = color
+
+        frame_ids = [model_visu.getFrameId(f) for f in joint_frames]
+        
+        # Visualize every 5th point to avoid clutter
+        for i in range(0, len(xs_array), 5):
+            q = xs_array[i]
+            pin.forwardKinematics(model_visu, data_visu, q[:robot.nq])
+            pin.updateFramePlacements(model_visu, data_visu)
+            for f, fid in zip(joint_frames, frame_ids):
+                pos = data_visu.oMf[fid].translation
+                # Make spheres smaller for MPC trajectories
+                sim.addSphereMarker(pos, radius=0.005, color=colors[f])
+    
     control_counter = 0
     max_steps = 1000  # Safety limit
     
@@ -70,6 +115,14 @@ def run_mpc_control(sim, robot, mpc, x0):
                 if u is None or x_d is None:
                     print("MPC returned no control, stopping.")
                     break
+                    
+                # Visualize newly planned trajectory (only when replanned)
+                if VISU and mpc.trajectory_updated:
+                    print(f"Visualizing MPC trajectory (replan #{visualization_counter})")
+                    visualize_mpc_trajectory(mpc.current_states, visualization_counter)
+                    visualization_counter += 1
+                    mpc.trajectory_updated = False  # Reset flag
+                    
             except Exception as e:
                 print(f"MPC step failed: {e}")
                 break

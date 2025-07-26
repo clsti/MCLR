@@ -42,6 +42,7 @@ class MPCController:
         self.current_controls = []
         self.current_states = []
         self.current_control_idx = 0
+        self.trajectory_updated = False  # Flag to indicate new trajectory available
         
         # Previous solution for warm start
         self.prev_controls = None
@@ -135,6 +136,7 @@ class MPCController:
         self.current_controls = controls
         self.current_states = states
         self.current_control_idx = 0
+        self.trajectory_updated = True  # Mark that new trajectory is available
         
         # Save for next warm start
         self.prev_controls = copy.deepcopy(controls)
@@ -255,5 +257,6 @@ class MPCController:
             'full_step_counter': self.full_step_counter,
             'current_control_idx': self.current_control_idx,
             'controls_remaining': len(self.current_controls) - self.current_control_idx,
-            'controls_in_current_step': self.total_controls_executed % self.controls_per_full_step
+            'controls_in_current_step': self.total_controls_executed % self.controls_per_full_step,
+            'trajectory_updated': self.trajectory_updated
         }

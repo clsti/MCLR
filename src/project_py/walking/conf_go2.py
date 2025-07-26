@@ -72,7 +72,7 @@ Kd = np.array([
 ################################################################################
 # simulation frequency
 ################################################################################
-sim_freq = 100
+sim_freq = 200
 control_freq = 100
 sim_time_step = 1.0 / sim_freq
 control_time_step = 1.0 / control_freq
@@ -83,14 +83,14 @@ control_steps_per_sim = int(sim_freq / control_freq)
 ################################################################################
 step_length = 0.25  # [m]
 step_height = 0.10  # [m]
-n_per_step = 100  # number of time steps per step
+n_per_step = 50  # number of time steps per step
 time_step = control_time_step  # [s]
 n_steps = 6  # number of steps to plan
 
 ################################################################################
 # MPC parameters
 ################################################################################
-mpc_enabled = True  # Enable MPC controller
-mpc_horizon = 3  # Number of steps to plan ahead in MPC
-mpc_replan_frequency = 1.0  # Replan every N full steps (RR->LF->RF->LH = 1 full step)
+mpc_enabled = False  # Enable MPC controller
+mpc_horizon = 2  
+mpc_replan_frequency = 1.0  
 mpc_warm_start = False  # Use previous solution as initial guess
