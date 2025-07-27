@@ -96,15 +96,15 @@ class TrajectoriesPlanner():
         x0_rh, x0_rf, x0_lh, x0_lf = x0_pos
         if self.first_step:
             rh_traj = self._get_traj([x0_rh], x0_com, [self.rhFootId], True)
-            lf_traj = self._get_traj([x0_lf], x0_com, [self.lfFootId], True)
+            rf_traj = self._get_traj([x0_rf], x0_com, [self.rfFootId], True)
             self.first_step = False
         else:
             rh_traj = self._get_traj([x0_rh], x0_com, [self.rhFootId])
-            lf_traj = self._get_traj([x0_lf], x0_com, [self.lfFootId])
-        rf_traj = self._get_traj([x0_rf], x0_com, [self.rfFootId])
+            rf_traj = self._get_traj([x0_rf], x0_com, [self.rfFootId])
         lh_traj = self._get_traj([x0_lh], x0_com, [self.lhFootId])
+        lf_traj = self._get_traj([x0_lf], x0_com, [self.lfFootId])
 
-        return rh_traj, lf_traj, rf_traj, lh_traj
+        return rh_traj, rf_traj, lh_traj, lf_traj
 
     def get_N_full_steps(self, x0, N, x0_com):
         foot_traj_N = []
@@ -114,11 +114,11 @@ class TrajectoriesPlanner():
         x0_pos = self.get_foot_states(x0)
 
         for _ in range(N):
-            rh_traj, lf_traj, rf_traj, lh_traj = self.get_full_step_itr(
+            rh_traj, rf_traj, lh_traj, lf_traj = self.get_full_step_itr(
                 x0_pos, x0_com)
             foot_traj_N.append(
-                [rh_traj[0], lf_traj[0], rf_traj[0], lh_traj[0]])
-            com_traj_N.append([rh_traj[1], lf_traj[1], rf_traj[1], lh_traj[1]])
+                [rh_traj[0], rf_traj[0], lh_traj[0], lf_traj[0]])
+            com_traj_N.append([rh_traj[1], rf_traj[1], lh_traj[1], lf_traj[1]])
 
         return foot_traj_N, com_traj_N
 

@@ -152,11 +152,11 @@ class Go2Controller():
 
     def walking_problem_one_step(self, timeStep, foot_traj, com_traj):
         """
-        foot_traj = [rh_traj, lf_traj, rf_traj, lh_traj]
+        foot_traj = [rh_traj, rf_traj, lh_traj, lf_traj]
         com_traj = [com_traj, com_traj, com_traj, com_traj]
         """
         # get trajectories
-        rh_traj, lf_traj, rf_traj, lh_traj = foot_traj
+        rh_traj, rf_traj, lh_traj, lf_traj = foot_traj
 
         # action models
         act_models = []
@@ -183,24 +183,13 @@ class Go2Controller():
             supportFootIds,
             swingFootIds
         )
-        # ------------------ LEFT FRONT ------------------ #
-        swingFootIds = [self.lfFootId]
-        supportFootIds = [self.rfFootId, self.lhFootId, self.rhFootId]
-        # Left front foot
-        act_models += self.createFootstepModels(
-            timeStep,
-            com_traj[1],
-            lf_traj,
-            supportFootIds,
-            swingFootIds
-        )
         # ------------------ RIGHT FRONT ------------------ #
         swingFootIds = [self.rfFootId]
         supportFootIds = [self.lfFootId, self.lhFootId, self.rhFootId]
         # Right front foot
         act_models += self.createFootstepModels(
             timeStep,
-            com_traj[2],
+            com_traj[1],
             rf_traj,
             supportFootIds,
             swingFootIds
@@ -208,11 +197,22 @@ class Go2Controller():
         # ------------------ LEFT REAR ------------------ #
         swingFootIds = [self.lhFootId]
         supportFootIds = [self.lfFootId, self.rfFootId, self.rhFootId]
-        # Left rear foot
+        # Right rear foot
+        act_models += self.createFootstepModels(
+            timeStep,
+            com_traj[2],
+            lh_traj,
+            supportFootIds,
+            swingFootIds
+        )
+        # ------------------ LEFT FRONT ------------------ #
+        swingFootIds = [self.lfFootId]
+        supportFootIds = [self.rfFootId, self.lhFootId, self.rhFootId]
+        # Right front foot
         act_models += self.createFootstepModels(
             timeStep,
             com_traj[3],
-            lh_traj,
+            lf_traj,
             supportFootIds,
             swingFootIds
         )
