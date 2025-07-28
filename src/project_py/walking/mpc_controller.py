@@ -68,11 +68,11 @@ class MPCController:
             bool: True if replanning is needed
         """
         # Debug output
-        print(f"DEBUG: total_controls={self.total_controls_executed}, "
-              f"replan_every={self.replan_every_n_controls}, "
-              f"current_control_idx={self.current_control_idx}, "
-              f"total_available={len(self.current_controls) if self.current_controls else 0}")
-        
+        #print(f"DEBUG: total_controls={self.total_controls_executed}, "
+        #      f"replan_every={self.replan_every_n_controls}, "
+        #      f"current_control_idx={self.current_control_idx}, "
+        #      f"total_available={len(self.current_controls) if self.current_controls else 0}")
+
         # Replan at the start
         if self.total_controls_executed == 0:
             print("DEBUG: Replanning - initial plan")
@@ -121,9 +121,20 @@ class MPCController:
                 # Shift previous solution as initial guess
                 x_init = self._shift_trajectory(self.prev_states, current_state)
                 u_init = self._shift_controls(self.prev_controls)
-                controls, states = self.controller.solve_with_initial_guess(
-                    current_state, problem, x_init, u_init)
-                print("Used warm start successfully")
+                
+                # Additional validation before using warm start
+                if u_init is None:
+                    print("Shifted controls are invalid, using cold start")
+                    controls, states = self.controller.solve(current_state, problem)
+                else:
+                    # Debug info about warm start dimensions
+                    print(f"Warm start: x_init length={len(x_init)}, u_init length={len(u_init)}")
+                    if len(u_init) > 0:
+                        print(f"First control dimension: {u_init[0].shape if hasattr(u_init[0], 'shape') else 'no shape'}")
+                    
+                    controls, states = self.controller.solve_with_initial_guess(
+                        current_state, problem, x_init, u_init)
+                    print("Used warm start successfully")
             except Exception as e:
                 # Fallback to cold start if warm start fails
                 print(f"Warm start failed ({e}), using cold start")
@@ -205,21 +216,19 @@ class MPCController:
         Returns:
             list: Shifted trajectory for warm start
         """
-        if not prev_states or len(prev_states) < 2:
+        # No shifting needed - always start from the beginning
+        if not prev_states:
             return [current_state] * 100  # Fallback
         
-        # Simple shift: use states from one full step onwards
-        shift_idx = min(self.controls_per_full_step, len(prev_states) - 1)
-        shifted = prev_states[shift_idx:]
-        
-        # Pad with last state if needed
-        while len(shifted) < len(prev_states):
-            shifted.append(prev_states[-1])
-        
-        # Replace first state with current state
-        shifted[0] = current_state
-        
-        return shifted
+        # Convert to list and return states starting with current state
+        if len(prev_states) > 1:
+            # Create new list starting with current state, then rest of previous states
+            result = [current_state]
+            for i in range(1, len(prev_states)):
+                result.append(prev_states[i])
+            return result
+        else:
+            return [current_state]
 
     def _shift_controls(self, prev_controls):
         """
@@ -231,18 +240,8 @@ class MPCController:
         Returns:
             list: Shifted control sequence
         """
-        if not prev_controls or len(prev_controls) < 2:
-            return None
-        
-        # Simple shift: use controls from one full step onwards  
-        shift_idx = min(self.controls_per_full_step, len(prev_controls) - 1)
-        shifted = prev_controls[shift_idx:]
-        
-        # Pad with last control if needed
-        while len(shifted) < len(prev_controls):
-            shifted.append(prev_controls[-1])
-        
-        return shifted
+        # No shifting needed - return previous controls as is
+        return prev_controls if prev_controls else None
 
     def get_stats(self):
         """
