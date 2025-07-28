@@ -10,6 +10,12 @@ import example_robot_data
 class Go2():
 
     def __init__(self, sim):
+        """
+        Initialize the Go2 robot in simulation.
+
+        Args:
+            sim: Simulator.
+        """
         self.sim = sim
         self.conf = conf
 
@@ -33,17 +39,29 @@ class Go2():
             useFixedBase=False
         )
 
-        # PD parameters 
-        self.Kp = conf.Kp  
-        self.Kd = conf.Kd  
+        # PD parameters
+        self.Kp = conf.Kp
+        self.Kd = conf.Kd
 
         # Fallback torque
         self.tau_ff_fallback = np.zeros(12)
 
     def update(self):
+        """
+        Update the robot's state.
+        """
         self.robot.update()
 
     def get_state(self, nqx=False):
+        """
+        Get the robot state vector.
+
+        Args:
+            nqx (bool): If True, return base orientation in exponential coordinates.
+
+        Returns:
+            np.ndarray: Concatenated state vector [q, v].
+        """
         # Get base position and orientation
         base_pos = self.robot.baseWorldPosition()
         base_orn = self.robot.baseWorldOrientation()  # quaternion [x,y,z,w]
@@ -66,10 +84,25 @@ class Go2():
         return np.concatenate([q, v])
 
     def get_com(self):
+        """
+        Get the current position of the center of mass (CoM).
+
+        Returns:
+            np.ndarray: CoM position.
+        """
         return self.robot.baseCoMPosition()
 
     def set_torque(self, tau_ff, q_d=None, q=None, v_d=None, v=None):
-        
+        """
+        Apply torque commands to the robot's actuated joints, with optional PD control.
+
+        Args:
+            tau_ff (np.ndarray): Feedforward torques from controller.
+            q_d (np.ndarray, optional): Desired joint positions.
+            q (np.ndarray, optional): Current joint positions.
+            v_d (np.ndarray, optional): Desired joint velocities.
+            v (np.ndarray, optional): Current joint velocities.
+        """
         # Torque from crocoddyl sometimes empty -> use fallback torque from previous run if possible
         if tau_ff.shape == (0,):
             tau_ff = self.tau_ff_fallback
@@ -82,15 +115,17 @@ class Go2():
             v_dif = v_d - v
 
             tau = self.Kp * q_dif + self.Kd * v_dif + tau_ff
-            #print(f"tauf_ff: {tau_ff}, tau: {tau}")
-            #print(f"difference between tau: {tau - tau_ff}")
         else:
             tau = tau_ff
 
         self.robot.setActuatedJointTorques(tau)
 
     def set_position(self, pos, vel=None):
+        """
+        Set desired joint positions (and velocities) for actuated joints.
+
+        Args:
+            pos (np.ndarray): Desired joint positions.
+            vel (np.ndarray, optional): Desired joint velocities.
+        """
         self.robot.setActuatedJointPositions(pos, v=vel)
-
-
-

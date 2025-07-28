@@ -5,9 +5,22 @@ import walking.conf_go2 as conf
 
 
 class TrajectoriesPlanner():
+    """"
+    Trajectory Planner for a quadruped robot walking task.
+    """
 
     def __init__(self, model, data, step_length, step_height, time_step, n_per_step):
+        """
+        Initialize the trajectory planner for quadruped walking.
 
+        Args:
+            model (pinocchio.Model): Robot model.
+            data (pinocchio.Data): Robot data.
+            step_length (float): Desired step length in the x-direction.
+            step_height (float): Maximum swing foot height during step.
+            time_step (float): Time between each trajectory point.
+            n_per_step (int): Number of points per step.
+        """
         self.model = model
         self.data = data
 
@@ -31,6 +44,15 @@ class TrajectoriesPlanner():
         self.lfFootId = self.model.getFrameId(self.lfFoot)
 
     def get_foot_states(self, x0):
+        """
+        Compute the current foot positions for a given state.
+
+        Args:
+            x0 (np.array): Robot state
+
+        Returns:
+            Tuple of np.array: (rhFootPos0, rfFootPos0, lhFootPos0, lfFootPos0) - current positions of each foot in world frame.
+        """
         q0 = x0[: self.model.nq]
         pin.forwardKinematics(self.model, self.data, q0)
         pin.updateFramePlacements(self.model, self.data)
@@ -43,7 +65,18 @@ class TrajectoriesPlanner():
 
     def _get_traj(self, x0_foot_positions, x0_com, swingFootIds, half_step=False):
         """
-        Get the trajectory for one foot and respective com task
+        Generate swing foot and COM trajectories for one step phase.
+
+        Args:
+            x0_foot_positions (list of np.array): Current foot positions for swing feet.
+            x0_com (np.array): Current center-of-mass position.
+            swingFootIds (list): List of frame IDs of the swing feet.
+            half_step (bool): If True, perform a half-length step (used at start).
+
+        Returns:
+            tuple:
+                - foot_traj (list): Foot trajectory per time step. Each item is a list of [frameId, SE3].
+                - com_traj (list): Center-of-mass trajectory per time step.
         """
         if half_step:
             step_length = 0.5 * self.step_length
@@ -91,7 +124,15 @@ class TrajectoriesPlanner():
 
     def get_full_step_itr(self, x0_pos, x0_com):
         """
-        x0_pos = [x0_rh, x0_rf, x0_lh, x0_lf]
+        Generate full walking step trajectories for all four legs.
+
+        Args:
+            x0_pos (list of np.array): Initial positions of [rh, rf, lh, lf] feet.
+            x0_com (np.array): Initial center-of-mass position.
+
+        Returns:
+            tuple: (rh_traj, rf_traj, lh_traj, lf_traj)
+                Each is a tuple of (foot_traj, com_traj) from `_get_traj`.
         """
         x0_rh, x0_rf, x0_lh, x0_lf = x0_pos
         if self.first_step:
@@ -107,6 +148,19 @@ class TrajectoriesPlanner():
         return rh_traj, rf_traj, lh_traj, lf_traj
 
     def get_N_full_steps(self, x0, N, x0_com):
+        """
+        Generate N full walking step trajectories.
+
+        Args:
+            x0 (np.array): Initial full robot state.
+            N (int): Number of full steps to plan.
+            x0_com (np.array): Initial COM position.
+
+        Returns:
+            tuple:
+                - foot_traj_N (list): Nested list of foot trajectories for N steps.
+                - com_traj_N (list): Nested list of COM trajectories for N steps.
+        """
         foot_traj_N = []
         com_traj_N = []
 
@@ -123,6 +177,14 @@ class TrajectoriesPlanner():
         return foot_traj_N, com_traj_N
 
     def visualize_trajectories(self, sim, foot_trajectories, com_trajectories):
+        """
+        Visualize planned foot and COM trajectories in the simulator.
+
+        Args:
+            sim: Simulator.
+            foot_trajectories (list): List of planned foot trajectories.
+            com_trajectories (list): List of planned COM trajectories.
+        """
         for com_traj, foot_traj in zip(com_trajectories, foot_trajectories):
             for com_task, foot_pos_task in zip(com_traj, foot_traj):
                 for com_pos, foot_pos in zip(com_task, foot_pos_task):

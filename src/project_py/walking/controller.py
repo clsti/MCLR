@@ -4,14 +4,27 @@ import walking.conf_go2 as conf
 
 import numpy as np
 import pinocchio as pin
-
 import crocoddyl
 
 
 class Go2Controller():
+    """
+    Go2Controller class for controlling a Go2 quadruped robot using Crocoddyl.
+    """
 
     def __init__(self, model, data, com_h_ref, integrator="euler", control="zero", fwddyn=True):
-
+        """
+        Args:
+            model: Robot model 
+            data: Robot data
+            com_h_ref: Desired center of mass height
+            integrator: type of the integrator
+                (options are: 'euler', and 'rk4')
+            control: type of control parametrization
+                (options are: 'zero', 'one', and 'rk4')
+            fwddyn: True for forward-dynamics and False for inverse-dynamics
+                formulations
+        """
         self.model = model
         self.data = data
         self.nq = self.model.nq
@@ -25,6 +38,7 @@ class Go2Controller():
         self.rfFoot = conf.rfFoot
         self.lhFoot = conf.lhFoot
         self.rhFoot = conf.rhFoot
+
         self.solver = None
 
         # Getting the frame id for all the legs
@@ -39,7 +53,7 @@ class Go2Controller():
             [q0, np.zeros(self.model.nv)])
         self.com_h_ref = com_h_ref
         # Defining the friction coefficient and normal
-        self.mu = 0.7
+        self.mu = 0.4
         self.Rsurf = np.eye(3)
 
         # flag for first step
@@ -58,47 +72,41 @@ class Go2Controller():
     # ----------------------------------- Solver ---------------------------------- #
     #################################################################################
 
-    def solve(self, x0, problem):
-        self.solver = crocoddyl.SolverBoxDDP(problem)
-        xs = [x0] * (self.solver.problem.T + 1)
-        us = self.solver.problem.quasiStatic(
-            [x0] * self.solver.problem.T)
-        self.solver.solve(xs, us, 100, False, 0.1)
-
-        return self.solver.us, self.solver.xs
-
-    def solve_with_initial_guess(self, x0, problem, xs_init, us_init):
+    def solve(self, x0, problem, xs_init=None, us_init=None):
         """
-        Solve the optimal control problem with an initial guess (warm start).
-        
+        Solve the optimal control problem.
+
         Args:
             x0: Initial state
             problem: Crocoddyl shooting problem
             xs_init: Initial guess for state trajectory
             us_init: Initial guess for control trajectory
-            
+
         Returns:
             tuple: (controls, states)
         """
         self.solver = crocoddyl.SolverBoxDDP(problem)
-        
-        # Use provided initial guess
-        if us_init is not None and len(us_init) == self.solver.problem.T:
+
+        T = self.solver.problem.T
+
+        # Use initial guess for warmstart
+        if us_init is not None and len(us_init) == T:
             us = us_init
         else:
-            us = self.solver.problem.quasiStatic([x0] * self.solver.problem.T)
-            
-        if xs_init is not None and len(xs_init) == self.solver.problem.T + 1:
+            us = self.solver.problem.quasiStatic([x0] * T)
+
+        if xs_init is not None and len(xs_init) == T + 1:
             xs = xs_init
         else:
-            xs = [x0] * (self.solver.problem.T + 1)
-        
+            xs = [x0] * (T + 1)
+
         self.solver.solve(xs, us, 100, False, 0.1)
         return self.solver.us, self.solver.xs
 
-
     def get_feedback_gains(self, node_index=0):
-        """Get feedback gains k and K from the solved problem"""
+        """
+        Get feedback gains k and K from the solved problem
+        """
         if self.solver is None:
             raise RuntimeError("Must call solve() first")
 
@@ -118,14 +126,22 @@ class Go2Controller():
     #################################################################################
 
     def standing_problem(self, x0):
+        """
+        Create a simple standing (static) Crocoddyl problem with full contact.
+
+        Args:
+            x0 (np.ndarray): Initial robot state.
+
+        Returns:
+            crocoddyl.ShootingProblem: Shooting problem with standing contact.
+        """
         # action models
         act_models = []
-
         timeStep = 1e-2
         supportFootIds = [self.lfFootId, self.rfFootId,
                           self.lhFootId, self.rhFootId]
 
-        T = 5
+        T = 5  # Horizon length
         contact_action = self.create_contact_action(timeStep, supportFootIds)
         for _ in range(T):
             act_models.append(contact_action)
@@ -137,8 +153,16 @@ class Go2Controller():
 
     def walking_problem_ocp(self, x0, timeStep, foot_traj, com_traj):
         """
-        foot_traj: list of multiple foot trajectories according to horizon N
-        com_traj: list of multiple com trajectories according to horizon N
+        Create a full walking optimal control problem (OCP).
+
+        Args:
+            x0 (np.ndarray): Initial state.
+            timeStep (float): Time step duration.
+            foot_traj (list): List of foot trajectories for each phase.
+            com_traj (list): List of CoM trajectories for each phase.
+
+        Returns:
+            crocoddyl.ShootingProblem: A shooting problem representing the walking motion.
         """
         act_models = []
 
@@ -152,30 +176,33 @@ class Go2Controller():
 
     def walking_problem_one_step(self, timeStep, foot_traj, com_traj):
         """
-        foot_traj = [rh_traj, rf_traj, lh_traj, lf_traj]
-        com_traj = [com_traj, com_traj, com_traj, com_traj]
+        Create action models for one full gait cycle (RR, RF, LR, LF swing).
+
+        Args:
+            timeStep (float): Time step duration.
+            foot_traj (list): List of foot trajectories [rh, rf, lh, lf].
+            com_traj (list): List of CoM trajectories for each swing phase.
+
+        Returns:
+            list: A sequence of action models for a full gait cycle.
         """
-        # get trajectories
+        # Get individual foot trajectories
         rh_traj, rf_traj, lh_traj, lf_traj = foot_traj
 
-        # action models
         act_models = []
 
-        # some parameters to put somewhere else
+        # ------------------ Double support ------------------ #
         initKnots = 2
         supportFootIds = [self.lfFootId, self.rfFootId,
                           self.lhFootId, self.rhFootId]
-
-        # walking phase
         if self.firstStep:
-            # inital double support phase
             act_models += [self.create_contact_action(
                 timeStep, supportFootIds)for _ in range(initKnots)]
 
-        # ------------------ RIGHT REAR ------------------ #
+        # Walking phase
+        # ------------------ RIGHT REAR SWING ------------------ #
         swingFootIds = [self.rhFootId]
         supportFootIds = [self.lfFootId, self.rfFootId, self.lhFootId]
-        # Right rear foot
         act_models += self.createFootstepModels(
             timeStep,
             com_traj[0],
@@ -183,10 +210,9 @@ class Go2Controller():
             supportFootIds,
             swingFootIds
         )
-        # ------------------ RIGHT FRONT ------------------ #
+        # ------------------ RIGHT FRONT SWING ------------------ #
         swingFootIds = [self.rfFootId]
         supportFootIds = [self.lfFootId, self.lhFootId, self.rhFootId]
-        # Right front foot
         act_models += self.createFootstepModels(
             timeStep,
             com_traj[1],
@@ -194,10 +220,9 @@ class Go2Controller():
             supportFootIds,
             swingFootIds
         )
-        # ------------------ LEFT REAR ------------------ #
+        # ------------------ LEFT REAR SWING ------------------ #
         swingFootIds = [self.lhFootId]
         supportFootIds = [self.lfFootId, self.rfFootId, self.rhFootId]
-        # Right rear foot
         act_models += self.createFootstepModels(
             timeStep,
             com_traj[2],
@@ -205,10 +230,9 @@ class Go2Controller():
             supportFootIds,
             swingFootIds
         )
-        # ------------------ LEFT FRONT ------------------ #
+        # ------------------ LEFT FRONT SWING ------------------ #
         swingFootIds = [self.lfFootId]
         supportFootIds = [self.rfFootId, self.lhFootId, self.rhFootId]
-        # Right front foot
         act_models += self.createFootstepModels(
             timeStep,
             com_traj[3],
@@ -217,23 +241,36 @@ class Go2Controller():
             swingFootIds
         )
 
-        # TODO: Double support phase in between?
+        # ------------------ Double support ------------------ #
         act_models += [self.create_contact_action(
             timeStep, supportFootIds)]
 
         return act_models
 
     def createFootstepModels(self, timeStep, com_trajectories, foot_trajectories, supportFootIds, swingFootIds):
+        """
+        Create Crocoddyl action models for a single footstep swing.
+
+        Args:
+            timeStep (float): Time step duration.
+            com_trajectories (list): Desired CoM trajectory during swing.
+            foot_trajectories (list): Desired swing foot trajectory.
+            supportFootIds (list): IDs of feet in contact.
+            swingFootIds (list): IDs of feet in swing.
+
+        Returns:
+            list: Action models for the swing phase and foot switch.
+        """
         foot_swing_model = []
         swing_foot_tasks = []
-        # iterate through timesteps
+
         for com_task, foot_task in zip(com_trajectories, foot_trajectories):
             foot_swing_model += [
                 self.create_swingfoot_action(
                     timeStep, supportFootIds, com_task, foot_task)
             ]
 
-        # Action model for the foot switch
+        # Final switching model to land the foot
         foot_switch_model = self.createFootSwitchModel(
             swingFootIds, swing_foot_tasks)
 
@@ -245,7 +282,16 @@ class Go2Controller():
 
     def create_swingfoot_action(self, timeStep, supportFootIds, comTask, swingFootTask):
         """
-        swingFootTask structure: (ID, orientation, position)
+        Create an action model for a swing phase of one leg.
+
+        Args:
+            timeStep (float): Time step duration.
+            supportFootIds (list): IDs of feet in contact.
+            comTask (np.ndarray): Desired center of mass (CoM) target.
+            swingFootTask (tuple): (footId, SE(3)) tuple for swing foot.
+
+        Returns:
+            crocoddyl.ActionModel: Swing foot action model with CoM and swing foot cost.
         """
         if self._fwddyn:
             nu = self.actuation.nu
@@ -264,6 +310,16 @@ class Go2Controller():
         return action_model
 
     def create_contact_action(self, timeStep, supportFootIds):
+        """
+        Create an action model for a full contact phase (no swing legs).
+
+        Args:
+            timeStep (float): Time step duration.
+            supportFootIds (list): List of foot frame IDs in contact.
+
+        Returns:
+            crocoddyl.ActionModel: Action model with contact constraints and cost.
+        """
         if self._fwddyn:
             nu = self.actuation.nu
         else:
@@ -285,7 +341,18 @@ class Go2Controller():
     #################################################################################
 
     def _create_action_model(self, timeStep, contactModel, costModel, nu):
-        """Create Action model for KKT conditions"""
+        """
+        Create an integrated action model using a specified dynamics model, control parametrization, and integrator.
+
+        Args:
+            timeStep (float): Time step duration.
+            contactModel (crocoddyl.ContactModelMultiple): Contact model with supporting feet.
+            costModel (crocoddyl.CostModelSum): Cost model including task objectives.
+            nu (int): Dimension of control input.
+
+        Returns:
+            crocoddyl.IntegratedActionModelAbstract: Integrated action model (Euler or Runge-Kutta).
+        """
         if self._fwddyn:
             dmodel = crocoddyl.DifferentialActionModelContactFwdDynamics(
                 self.state, self.actuation, contactModel, costModel, 0.0, True
@@ -327,7 +394,16 @@ class Go2Controller():
         return model
 
     def _create_contact_model(self, supportFootIds, nu):
-        """Create a 3D multi-contact model including supporting"""
+        """
+        Create a 3D multi-contact model for the given support feet.
+
+        Args:
+            supportFootIds (list): IDs of feet in contact.
+            nu (int): Dimension of control input.
+
+        Returns:
+            crocoddyl.ContactModelMultiple: Contact model with all supporting feet added.
+        """
         contactModel = crocoddyl.ContactModelMultiple(self.state, nu)
         for i in supportFootIds:
             supportContactModel = crocoddyl.ContactModel3D(
@@ -349,7 +425,14 @@ class Go2Controller():
 
     def _add_swingfoot_cost(self, costModel, swingFootTask, nu):
         """
-        swingFootTask structure: (ID, orientation, position)
+        Add foot tracking cost for swing foot trajectories.
+
+        Args:
+            costModel (crocoddyl.CostModelSum): Cost model
+            swingFootTask (list of tuples): Each tuple contains:
+                - ID (int): Frame ID of the swing foot.
+                - SE3: Desired position and translation of the swing foot.
+            nu (int): Dimension of the control input.
         """
         for i in swingFootTask:
             frameTranslationResidual = crocoddyl.ResidualModelFrameTranslation(
@@ -364,7 +447,18 @@ class Go2Controller():
             )
 
     def _add_contact_cost(self, costModel, supportFootIds, nu):
-        """Creating the cost model for a contact phase"""
+        """
+        Add contact-related costs including:
+            - Friction cone constraints
+            - State regularization
+            - Control regularization
+            - Joint/state bounds
+
+        Args:
+            costModel (crocoddyl.CostModelSum): Cost model
+            supportFootIds (list): IDs of feet in contact.
+            nu (int): Dimension of the control input.
+        """
         # Friction model
         for i in supportFootIds:
             cone = crocoddyl.FrictionCone(self.Rsurf, self.mu, 4, False)
@@ -378,10 +472,10 @@ class Go2Controller():
                 self.state, coneActivation, coneResidual
             )
             costModel.addCost(
-                self.model.frames[i].name + "_frictionCone", frictionCone, 1e1
+                self.model.frames[i].name + "_frictionCone", frictionCone, 1e2
             )
         stateWeights = np.array(
-            [0.0] * 3                       # base position (x, y, z)
+            [10.0] * 3                       # base position (x, y, z)
             + [500.0] * 3                   # base orientation (roll, pitch, yaw) # noqa
             + [0.01] * (self.model.nv - 6)  # joint positions
             + [10.0] * 6                    # base linear & angular velocity
@@ -423,6 +517,14 @@ class Go2Controller():
         costModel.addCost("stateBounds", stateBounds, 1e3)
 
     def _add_com_cost(self, costModel, com_d, nu):
+        """
+        Add center-of-mass tracking cost.
+
+        Args:
+            costModel (crocoddyl.CostModelSum): Cost model
+            com_d (np.array): Desired CoM position (3D).
+            nu (int): Dimension of the control input.
+        """
         com_residual = crocoddyl.ResidualModelCoMPosition(
             self.state, com_d, nu)
         comTrack = crocoddyl.CostModelResidual(self.state, com_residual)

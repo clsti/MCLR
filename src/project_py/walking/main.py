@@ -10,24 +10,17 @@ import walking.conf_go2 as conf
 import pinocchio as pin
 import numpy as np
 
-# Some TODO
-# - Run torque updates ar a lower frequency than simulation updates
-# - MPC (timing relevant!)
-# - tune PD-gains jointwise
-# - all weights in config for easier tuning
-
 
 def main():
     sim = PybulletWrapper()
     robot = Go2(sim)
-    
+
     # com reference height
     com_h = robot.robot.baseCoMPosition()[2]
     controller = Go2Controller(robot.model, robot.data, com_h)
 
+    # get current state and com
     x0 = robot.get_state()
-    q_d = x0[7:robot.nq]
-    v_d = x0[robot.nq+6:robot.nq+robot.nv]
     x0_com = robot.get_com()
 
     # Create trajectory planner
@@ -35,40 +28,37 @@ def main():
     step_height = conf.step_height
     time_step = conf.time_step
     n_per_step = conf.n_per_step
-    
+
     traj_planner = TrajectoriesPlanner(robot.model, robot.data, step_length,
                                        step_height, time_step, n_per_step)
 
-    
     if conf.mpc_enabled:
-        print("\n=== Using MPC Controller ===")
         mpc = MPCController(robot, controller, traj_planner)
-        run_mpc_control(sim, robot, mpc, x0)
+        run_mpc_control(sim, robot, mpc)
     else:
-        print("\n=== Using Traditional Pre-planned Controller ===")
         run_opc_control(sim, robot, controller, traj_planner, x0, x0_com)
 
 
-def run_mpc_control(sim, robot, mpc, x0):
+def run_mpc_control(sim, robot, mpc):
     """
     Run the MPC control loop.
     """
-    print("Starting MPC control loop...")
-    
+
     # Visualization setup
-    VISU = False  # Set to True to enable trajectory visualization (warning: may slow down simulation!)
+    # Set to True to enable trajectory visualization (warning: may slow down simulation!)
+    VISU = False
     visualization_counter = 0
-    
+
     def visualize_mpc_trajectory(states, color_offset=0):
         """Visualize MPC planned trajectory."""
         if not states or len(states) < 2:
             return
-            
+
         xs_array = [np.array(x) for x in states]
         model_visu = robot.model.copy()
         data_visu = model_visu.createData()
         joint_frames = ["FL_foot", "FR_foot", "RL_foot", "RR_foot"]
-        
+
         # Different colors for different MPC replans
         base_colors = [
             [1, 0, 0, 0.7],  # Red
@@ -76,7 +66,7 @@ def run_mpc_control(sim, robot, mpc, x0):
             [0, 0, 1, 0.7],  # Blue
             [1, 1, 0, 0.7],  # Yellow
         ]
-        
+
         # Cycle through colors for different replans
         colors = {}
         for i, frame in enumerate(joint_frames):
@@ -84,12 +74,12 @@ def run_mpc_control(sim, robot, mpc, x0):
             # Modify color intensity based on replan number
             intensity = max(0.3, 1.0 - (color_offset * 0.2) % 0.7)
             color[0] *= intensity
-            color[1] *= intensity 
+            color[1] *= intensity
             color[2] *= intensity
             colors[frame] = color
 
         frame_ids = [model_visu.getFrameId(f) for f in joint_frames]
-        
+
         # Visualize every 5th point to avoid clutter
         for i in range(0, len(xs_array), 5):
             q = xs_array[i]
@@ -99,15 +89,15 @@ def run_mpc_control(sim, robot, mpc, x0):
                 pos = data_visu.oMf[fid].translation
                 # Make spheres smaller for MPC trajectories
                 sim.addSphereMarker(pos, radius=0.005, color=colors[f])
-    
+
     control_counter = 0
-    max_steps = 1000  # Safety limit
-    
+    max_steps = 50000  # Safety limit
+
     for i in range(max_steps):
         # Get current robot state
         robot.update()
         current_state = robot.get_state()
-        
+
         # MPC step - get control and desired state
         if control_counter == 0:
             try:
@@ -115,18 +105,18 @@ def run_mpc_control(sim, robot, mpc, x0):
                 if u is None or x_d is None:
                     print("MPC returned no control, stopping.")
                     break
-                    
+
                 # Visualize newly planned trajectory (only when replanned)
                 if VISU and mpc.trajectory_updated:
-                    print(f"Visualizing MPC trajectory (replan #{visualization_counter})")
-                    visualize_mpc_trajectory(mpc.current_states, visualization_counter)
+                    visualize_mpc_trajectory(
+                        mpc.current_states, visualization_counter)
                     visualization_counter += 1
                     mpc.trajectory_updated = False  # Reset flag
-                    
+
             except Exception as e:
                 print(f"MPC step failed: {e}")
                 break
-        
+
         # Apply control
         if u is not None and x_d is not None:
             q = current_state[7:robot.nq]
@@ -134,31 +124,22 @@ def run_mpc_control(sim, robot, mpc, x0):
             q_d = x_d[7:robot.nq]
             v_d = x_d[robot.nq+6:]
             robot.set_torque(u, q_d, q, v_d, v)
-        
+
         # Step simulation
         sim.step()
         sim.debug()
         time.sleep(conf.sim_time_step)
-        
+
         # Update control counter
         control_counter = (control_counter + 1) % conf.control_steps_per_sim
-        
-        # Print stats periodically
-        if i % 100 == 0:
-            stats = mpc.get_stats()
-            print(f"Step {i}: Leg {stats['leg_counter']}, "
-                  f"Full steps: {stats['full_step_counter']}, "
-                  f"Controls remaining: {stats['controls_remaining']}")
-    
+
     print("MPC control loop finished.")
 
 
 def run_opc_control(sim, robot, controller, traj_planner, x0, x0_com):
     """
-    Run the traditional pre-planned control loop.
+    Run open loop pre-planned control.
     """
-    print("Starting traditional control loop...")
-    
     # get trajectory for N steps
     N = conf.n_steps
     foot_trajectories, com_trajectories = traj_planner.get_N_full_steps(
@@ -199,14 +180,14 @@ def run_opc_control(sim, robot, controller, traj_planner, x0, x0_com):
     VISU = False
     if VISU:
         visualize()
-        
+
     control_counter = 0
     current_control_idx = 0
     current_torque = None
     x_d = None
-    
+
     total_sim_steps = len(controls) * conf.control_steps_per_sim
-    
+
     for i in range(total_sim_steps):
         if control_counter == 0:
             if current_control_idx < len(controls):
@@ -217,18 +198,16 @@ def run_opc_control(sim, robot, controller, traj_planner, x0, x0_com):
             else:
                 print("No more controls available.")
                 break
-        
+
         robot.update()
         x0 = robot.get_state()
         q = x0[7:robot.nq]
         v = x0[robot.nq+6:robot.nq+robot.nv]
-        
+
         if current_torque is not None and x_d is not None:
             q_d = x_d[7:robot.nq]
             v_d = x_d[robot.nq+6:]
             robot.set_torque(current_torque, q_d, q, v_d, v)
-            # robot.set_torque(u)
-            #robot.set_position(x_d[:robot.nq])
 
         # Step the simulation
         sim.step()
@@ -236,39 +215,6 @@ def run_opc_control(sim, robot, controller, traj_planner, x0, x0_com):
 
         time.sleep(conf.sim_time_step)
         control_counter = (control_counter + 1) % conf.control_steps_per_sim
-
-        # ------------ TEST ------------
-        """
-        try:
-            k, K = controller.get_feedback_gains(node_index=0)
-
-            state_error = xs0 - x0
-            alpha = 1.0
-
-            if state_error.shape[0] == 37 and K.shape[1] == 36:
-                # Convert state error to tangent space representation
-                q_current = x0[:robot.nq]
-                q_ref = xs0[:robot.nq]
-                v_current = x0[robot.nq:]
-                v_ref = xs0[robot.nq:]
-
-                # configuration error in tangent space
-                q_error_tangent = pin.difference(
-                    controller.model, q_ref, q_current)
-                v_error = v_current - v_ref
-                state_error_tangent = np.concatenate(
-                    [q_error_tangent, v_error])
-
-                uk = u0 + alpha * k + K @ state_error_tangent
-                # print(f"uo: {u0}\nuk: {uk}")
-            else:
-                uk = u0 + alpha * k + K @ state_error
-
-        except (AttributeError, RuntimeError) as e:
-            print(f"Warning: Could not get feedback gains: {e}")
-            uk = u0
-        """
-        # ------------ TEST ------------
 
 
 if __name__ == '__main__':
