@@ -1,6 +1,0 @@
-a
-8. Is the t2_temp.py script a ROS node? why?
-   No, since 
-   - no ROS imports
-   - no ros initialization, publisher, subscriber or services
-   It is a standalone python script
