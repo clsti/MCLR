@@ -1,7 +1,8 @@
 // For format details, see https://aka.ms/devcontainer.json.
 {
 	"name": "ROS rolling",
-	"image": "tum-ics-ros:rolling-legged-robotics-devel-vscode",
+	//"image": "tum-ics-ros:rolling-legged-robotics-devel-vscode",
+	"image": "MCLR/project:V1",
 	"containerEnv": {
 		"CONT_PWD": "${containerWorkspaceFolder}",
 		"DISPLAY": "${localEnv:DISPLAY}",

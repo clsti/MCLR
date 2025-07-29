@@ -1,12 +1,16 @@
 import os
 import numpy as np
+import example_robot_data
+from pathlib import Path
 
 ################################################################################
 # robot
 ################################################################################
 
-go2_description = "/home/devel/miniconda3/envs/walking/share/example-robot-data/robots/go2_description/"
-urdf = os.path.join(go2_description, "urdf/go2.urdf")
+package_dir = Path(example_robot_data.__file__).resolve()
+env_root = package_dir.parents[4]
+urdf = os.path.join(str(env_root), "share",
+                    "example-robot-data", "robots", "go2_description", "urdf", "go2.urdf")
 
 lfFoot = "FL_foot"
 rfFoot = "FR_foot"
@@ -76,7 +80,7 @@ step_length = 0.20  # [m]
 step_height = 0.10  # [m]
 n_per_step = 50  # number of time steps per step
 time_step = control_time_step  # [s]
-n_steps = 7 # number of steps to plan
+n_steps = 7  # number of steps to plan
 
 ################################################################################
 # MPC parameters

@@ -2,10 +2,12 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python: File",
-            "type": "python",
+            "name": "Python Debugger: Current File",
+            "type": "debugpy",
             "request": "launch",
-            "program": "exercise_01/src/ros_visuals/ros_visuals/t11.py"
-        },
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "cwd": "${fileDirname}"
+        }
     ]
 }

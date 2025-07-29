@@ -1,4 +1,4 @@
-# Quadruped Walking Control Project
+# Modeling and Control of Legged Robots - Quadruped Walking Control Project
 
 This project implements walking control for the Go2 quadruped robot using optimal control methods. It supports both Open-loop Optimal Control (OPC) and Model Predictive Control (MPC) approaches with trajectory planning and visualization capabilities.
 
@@ -20,15 +20,6 @@ conda install -c conda-forge crocoddyl
 Additional dependencies may be required depending on your system configuration.
 
 ## Configuration
-
-### Path Configuration
-Before running the project, you must modify the paths in `conf_go2.py`:
-
-```python
-# Update this path to point to your Go2 robot description
-go2_description = "/path/to/your/go2_description/"
-urdf = os.path.join(go2_description, "urdf/go2.urdf")
-```
 
 ### Control Parameters
 The `conf_go2.py` file contains all configurable parameters:
@@ -180,6 +171,3 @@ Each leg movement consists of `n_per_step` time steps plus one foot switch actio
 - **NumPy**: Numerical computations
 - **Example Robot Data**: Robot model definitions
 
-## License
-
-[Add your license information here]
